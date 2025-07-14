@@ -195,3 +195,12 @@ footer {
     padding-top: 0;
   }
 }
+
+@media (max-width: 899px) {
+  .list-area .track-title {
+    font-size: 0.85rem;
+  }
+  .list-area .track-artist {
+    font-size: 0.75rem;
+  }
+}

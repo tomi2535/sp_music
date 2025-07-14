@@ -28,6 +28,7 @@ function App() {
   const [showFilter, setShowFilter] = useState(false);
   const [selectedVocalist, setSelectedVocalist] = useState<string>('');
   const [isRandom, setIsRandom] = useState(false); // ランダム再生ON/OFF
+  const [isRepeat, setIsRepeat] = useState(false); // リピート再生ON/OFF
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null);
@@ -105,7 +106,17 @@ function App() {
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     const remain = (duration - progress) * 1000;
     timeoutRef.current = setTimeout(() => {
-      if (isRandom) {
+      if (isRepeat) {
+        // 一度停止→再生でYouTube埋め込みの自動再生を確実にする
+        setIsPlaying(false);
+        setTimeout(() => {
+          setProgress(0);
+          setSeekedProgress(null);
+          setIframeKey(k => k + 1); // iframe再生成
+          setIsPlaying(true);
+          setAutoplay(true);
+        }, 100); // 100ms遅延
+      } else if (isRandom) {
         setCurrentTrackIdx(getRandomIndex());
         setAutoplay(true);
         setIsPlaying(true);
@@ -132,7 +143,7 @@ function App() {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrackIdx, filteredTracks, isPlaying, progress, isRandom]);
+  }, [currentTrackIdx, filteredTracks, isPlaying, progress, isRandom, isRepeat]);
 
   const currentTrack = filteredTracks[currentTrackIdx];
   if (!currentTrack) {
@@ -317,7 +328,7 @@ function App() {
               />
               <div style={{ minWidth: 0, overflow: 'hidden', flex: 1, textAlign: 'left' }}>
                 <div className="track-title">{track.track_title}</div>
-                <div className="track-artist">{track.artist}</div>
+                {/* <div className="track-artist">{track.artist}</div> */}
               </div>
             </div>
           ))}
@@ -326,9 +337,15 @@ function App() {
 
       {/* フッター操作パネル */}
       <footer>
-        <div style={{ position: 'absolute', left: 16, bottom: 24 }}>
+        <div style={{ position: 'absolute', left: 16, bottom: 24, display: 'flex', gap: 8 }}>
           <button
-            onClick={() => setIsRandom(r => !r)}
+            onClick={() => {
+              setIsRandom(r => {
+                const next = !r;
+                if (next) setIsRepeat(false); // ランダムOn時リピートOff
+                return next;
+              });
+            }}
             style={{
               ...iconBtnStyle,
               width: 32,
@@ -353,6 +370,37 @@ function App() {
               <line x1="4" y1="4" x2="9" y2="9" />
             </svg>
           </button>
+          <button
+            onClick={() => {
+              setIsRepeat(r => {
+                const next = !r;
+                if (next) setIsRandom(false); // リピートOn時ランダムOff
+                return next;
+              });
+            }}
+            style={{
+              ...iconBtnStyle,
+              width: 32,
+              height: 32,
+              color: isRepeat ? '#61dafb' : '#FEFCF5',
+              background: isRepeat ? 'rgba(97, 218, 251, 0.15)' : 'none',
+              border: 'none',
+              margin: 0,
+              padding: 0,
+              opacity: isRepeat ? 1 : 0.7,
+              borderRadius: '4px',
+              transition: 'color 0.2s, opacity 0.2s, background 0.2s',
+            }}
+            aria-label="リピート切替"
+          >
+            {/* リピートアイコン SVG */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="17 1 21 5 17 9" />
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" />
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            </svg>
+          </button>
         </div>
         {/* シークバー */}
         <input
@@ -364,7 +412,7 @@ function App() {
           onChange={handleSeek}
           onMouseUp={handleSeekCommit}
           onTouchEnd={handleSeekCommit}
-          style={{ width: '100%', margin: '8px 0 4px 0', accentColor: '#61dafb', height: 4 }}
+          style={{ width: '100%', margin: '12px 0 12px 0', accentColor: '#61dafb', height: 4 }}
         />
         {/* 楽曲情報と操作ボタン（縦並び） */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
@@ -373,12 +421,15 @@ function App() {
             <img src={currentTrack.thumbnail} alt={currentTrack.track_title} style={{ width: 40, height: 24, objectFit: 'cover', borderRadius: '4px', marginRight: 8 }} />
             <div style={{ color: '#fff', fontSize: '0.95rem', minWidth: 0, overflow: 'hidden', flex: 1, textAlign: 'left' }}>
               <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{currentTrack.track_title}</div>
-              <div style={{ fontSize: '0.85rem', color: '#bbb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{currentTrack.artist}</div>
+              {/* <div style={{ fontSize: '0.85rem', color: '#bbb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{currentTrack.artist}</div> */}
             </div>
           </div>
           {/* 操作ボタン（縦並び） */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <button onClick={handlePrev} disabled={currentTrackIdx === 0} style={iconBtnStyle} aria-label="前">
+            <button onClick={handlePrev} disabled={isRepeat || currentTrackIdx === 0} style={{
+              ...iconBtnStyle,
+              opacity: isRepeat || currentTrackIdx === 0 ? 0.4 : 1,
+            }} aria-label="前">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
             </button>
             {isPlaying ? (
@@ -390,7 +441,10 @@ function App() {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </button>
             )}
-            <button onClick={handleNext} disabled={currentTrackIdx === filteredTracks.length - 1} style={iconBtnStyle} aria-label="次">
+            <button onClick={handleNext} disabled={isRepeat || currentTrackIdx === filteredTracks.length - 1} style={{
+              ...iconBtnStyle,
+              opacity: isRepeat || currentTrackIdx === filteredTracks.length - 1 ? 0.4 : 1,
+            }} aria-label="次">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
             </button>
           </div>
