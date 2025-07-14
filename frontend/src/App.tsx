@@ -27,6 +27,9 @@ function App() {
   const [seekedProgress, setSeekedProgress] = useState<number | null>(null); // シーク確定用
   const [showFilter, setShowFilter] = useState(false);
   const [selectedVocalist, setSelectedVocalist] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [pendingCategory, setPendingCategory] = useState<string>('');
+  const [pendingVocalist, setPendingVocalist] = useState<string>('');
   const [isRandom, setIsRandom] = useState(false); // ランダム再生ON/OFF
   const [isRepeat, setIsRepeat] = useState(false); // リピート再生ON/OFF
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,6 +47,7 @@ function App() {
             track_title: t.track_title,
             artist: t.artist,
             vocalist: t.vocalist,
+            category: t.category, // カテゴリを追加
             start_time: Number(t.start_time),
             end_time: Number(t.end_time),
           }))
@@ -76,9 +80,18 @@ function App() {
   const vocalistList = Array.from(vocalistSet).sort();
 
   // フィルタ適用
-  const filteredTracks = selectedVocalist
-    ? tracks.filter(t => t.vocalist && t.vocalist.split(',').map((v: string) => v.trim()).includes(selectedVocalist))
-    : tracks;
+  const filteredTracks = tracks.filter(t => {
+    const matchCategory = !selectedCategory || t.category === selectedCategory;
+    const matchVocalist = !selectedVocalist || (t.vocalist && t.vocalist.split(',').map((v: string) => v.trim()).includes(selectedVocalist));
+    return matchCategory && matchVocalist;
+  });
+
+  // フィルタプレビュー（pending状態）
+  const previewTracks = tracks.filter(t => {
+    const matchCategory = !pendingCategory || t.category === pendingCategory;
+    const matchVocalist = !pendingVocalist || (t.vocalist && t.vocalist.split(',').map((v: string) => v.trim()).includes(pendingVocalist));
+    return matchCategory && matchVocalist;
+  });
 
   // トラック切り替え時や停止時にprogressリセット
   useEffect(() => {
@@ -254,7 +267,14 @@ function App() {
         <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '16px' }}>Speciale Music</span>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
-            onClick={() => setShowFilter(f => !f)}
+            onClick={() => setShowFilter(f => {
+              // フィルタパネルを開くときはpending値を現在値で初期化
+              if (!f) {
+                setPendingCategory(selectedCategory);
+                setPendingVocalist(selectedVocalist);
+              }
+              return !f;
+            })}
             style={{
               ...iconBtnStyle,
               width: 40,
@@ -273,16 +293,55 @@ function App() {
             </svg>
           </button>
           {showFilter && (
-            <div style={{ position: 'absolute', right: 0, top: 44, background: '#fff', color: '#222', border: '1px solid #ccc', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 2000, minWidth: 160 }}>
-              <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                <div>
-                  <button style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '8px', cursor: 'pointer', color: selectedVocalist ? '#222' : '#1976d2', fontWeight: selectedVocalist ? 'normal' : 'bold' }} onClick={() => { setSelectedVocalist(''); setCurrentTrackIdx(0); setShowFilter(false); }}>すべて</button>
+            <div className="filter-modal-overlay" onClick={() => setShowFilter(false)}>
+              <div className="filter-modal-content" style={{ maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                {/* カテゴリフィルタ */}
+                <div style={{ fontWeight: 'bold', marginBottom: 2 }}>カテゴリ</div>
+                <div className="custom-radio-group">
+                  <label className="custom-radio-label">
+                    <input className="custom-radio-input" type="radio" name="category" value="" checked={pendingCategory === ''} onChange={() => setPendingCategory('')} />
+                    <span className="custom-radio-custom" /> すべて
+                  </label>
+                  <label className="custom-radio-label">
+                    <input className="custom-radio-input" type="radio" name="category" value="utamita" checked={pendingCategory === 'utamita'} onChange={() => setPendingCategory('utamita')} />
+                    <span className="custom-radio-custom" /> 歌ってみた
+                  </label>
+                  <label className="custom-radio-label">
+                    <input className="custom-radio-input" type="radio" name="category" value="utawaku" checked={pendingCategory === 'utawaku'} onChange={() => setPendingCategory('utawaku')} />
+                    <span className="custom-radio-custom" /> 歌枠
+                  </label>
+                  <label className="custom-radio-label">
+                    <input className="custom-radio-input" type="radio" name="category" value="original" checked={pendingCategory === 'original'} onChange={() => setPendingCategory('original')} />
+                    <span className="custom-radio-custom" /> オリジナル
+                  </label>
                 </div>
-                {vocalistList.map(v => (
-                  <div key={v}>
-                    <button style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '8px', cursor: 'pointer', color: selectedVocalist === v ? '#1976d2' : '#222', fontWeight: selectedVocalist === v ? 'bold' : 'normal' }} onClick={() => { setSelectedVocalist(v); setCurrentTrackIdx(0); setShowFilter(false); }}>{v}</button>
-                  </div>
-                ))}
+                {/* ボーカリストフィルタ */}
+                <div style={{ fontWeight: 'bold', marginBottom: 2 }}>ボーカリスト</div>
+                <div className="custom-radio-group" style={{ marginBottom: 8 }}>
+                  <label className="custom-radio-label">
+                    <input className="custom-radio-input" type="radio" name="vocalist" value="" checked={pendingVocalist === ''} onChange={() => setPendingVocalist('')} />
+                    <span className="custom-radio-custom" /> すべて
+                  </label>
+                  {vocalistList.map(v => (
+                    <label key={v} className="custom-radio-label">
+                      <input className="custom-radio-input" type="radio" name="vocalist" value={v} checked={pendingVocalist === v} onChange={() => setPendingVocalist(v)} />
+                      <span className="custom-radio-custom" /> {v}
+                    </label>
+                  ))}
+                </div>
+                {/* 決定ボタン */}
+                <button
+                  style={{ width: '100%', padding: '8px', background: previewTracks.length === 0 ? '#ccc' : '#1976d2', color: '#fff', border: 'none', borderRadius: 4, fontWeight: 'bold', cursor: previewTracks.length === 0 ? 'not-allowed' : 'pointer', marginTop: 8 }}
+                  disabled={previewTracks.length === 0}
+                  onClick={() => {
+                    setSelectedCategory(pendingCategory);
+                    setSelectedVocalist(pendingVocalist);
+                    setShowFilter(false);
+                    setCurrentTrackIdx(0);
+                  }}
+                >
+                  決定
+                </button>
               </div>
             </div>
           )}
