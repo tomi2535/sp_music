@@ -50,29 +50,55 @@ function App() {
   useEffect(() => {
     if (!ytReady || !iframeContainerRef.current) return;
     if (playerRef.current) return;
-    playerRef.current = new window.YT.Player(iframeContainerRef.current, {
-      height: '100%',
-      width: '100%',
-      videoId: '', // 空のvideoIdで初期化
-      playerVars: {
-        controls: 1,
-        rel: 0,
-        playsinline: 1,
-      },
-      events: {
-        onReady: () => {
-          setPlayerReady(true);
-        },
-        onStateChange: (event: any) => {
-          if (event.data === window.YT.PlayerState.ENDED) {
-            setIsPlaying(false);
-          }
-        },
-        onError: (event: any) => {
-          console.log('YouTube Player Error:', event.data);
-        },
-      },
-    });
+    
+    // プレイヤー生成を少し遅延させてDOMの準備を確実にする
+    const initPlayer = () => {
+      try {
+        playerRef.current = new window.YT.Player(iframeContainerRef.current, {
+          height: '100%',
+          width: '100%',
+          // videoIdを指定せずに初期化（iframeのみ生成）
+          playerVars: {
+            controls: 1,
+            rel: 0,
+            playsinline: 1,
+            modestbranding: 1,
+            showinfo: 0,
+          },
+          events: {
+            onReady: () => {
+              console.log('YouTube Player Ready');
+              setPlayerReady(true);
+            },
+            onStateChange: (event: any) => {
+              if (event.data === window.YT.PlayerState.ENDED) {
+                setIsPlaying(false);
+              }
+            },
+            onError: (event: any) => {
+              console.log('YouTube Player Error:', event.data);
+              // エラー時はプレイヤーを再初期化
+              setTimeout(() => {
+                if (playerRef.current) {
+                  playerRef.current.destroy();
+                  playerRef.current = null;
+                  setPlayerReady(false);
+                  initPlayer();
+                }
+              }, 1000);
+            },
+          },
+        });
+      } catch (error) {
+        console.error('Failed to initialize YouTube player:', error);
+        // エラー時は再試行
+        setTimeout(initPlayer, 1000);
+      }
+    };
+    
+    // 少し遅延させて初期化
+    setTimeout(initPlayer, 100);
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytReady]);
 
@@ -95,17 +121,10 @@ function App() {
             end_time: Number(t.end_time),
           }));
         setTracks(parsedTracks);
-        console.log('tracks:', parsedTracks);
-        
-        // プレイヤーが準備できていて、トラックがある場合は最初の動画を設定
-        if (playerRef.current && playerReady && parsedTracks.length > 0) {
-          const firstTrack = parsedTracks[0];
-          playerRef.current.loadVideoById({
-            videoId: firstTrack.videoId,
-            startSeconds: firstTrack.start_time,
-            endSeconds: firstTrack.end_time,
-          });
-        }
+        console.log('tracks loaded:', parsedTracks.length);
+      })
+      .catch(error => {
+        console.error('Failed to load playlist:', error);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -114,11 +133,23 @@ function App() {
   useEffect(() => {
     if (playerReady && tracks.length > 0 && playerRef.current) {
       const firstTrack = tracks[0];
-      playerRef.current.loadVideoById({
-        videoId: firstTrack.videoId,
-        startSeconds: firstTrack.start_time,
-        endSeconds: firstTrack.end_time,
-      });
+      console.log('Loading first video:', firstTrack.videoId);
+      
+      // 少し遅延させて確実にプレイヤーが準備できるようにする
+      setTimeout(() => {
+        if (playerRef.current && playerReady) {
+          try {
+            playerRef.current.loadVideoById({
+              videoId: firstTrack.videoId,
+              startSeconds: firstTrack.start_time,
+              endSeconds: firstTrack.end_time,
+            });
+            console.log('First video loaded successfully');
+          } catch (error) {
+            console.error('Failed to load first video:', error);
+          }
+        }
+      }, 300);
     }
   }, [playerReady, tracks]);
 
@@ -567,7 +598,21 @@ function App() {
       {/* Youtube動画 */}
       <div className="main-content" style={{flex: 1, minHeight: 0}}>
         <div className="video-area" ref={videoAreaRef}>
-          <div ref={iframeContainerRef} style={{ width: '100%', height: '100%' }} />
+          <div 
+            ref={iframeContainerRef} 
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              minHeight: '200px',
+              background: '#000',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff'
+            }}
+          >
+            {!playerReady && <div>Loading YouTube Player...</div>}
+          </div>
         </div>
         <div className="list-area">
           {filteredTracks.map((track, idx) => (
