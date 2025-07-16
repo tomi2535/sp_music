@@ -68,7 +68,7 @@ function App() {
     playerRef.current = new window.YT.Player(iframeContainerRef.current, {
       height: '100%',
       width: '100%',
-      videoId: csvTracks[0].youtube_video_id,
+      videoId: '', // 空のvideoIdで初期化
       playerVars: {
         controls: 1,
         rel: 0,
@@ -97,32 +97,55 @@ function App() {
       .then(csvText => {
         const result = Papa.parse(csvText, { header: true });
         console.log('PapaParse result:', result.data);
-        setTracks(
-          result.data
-            .filter((t: any) => t.youtube_video_id && t.youtube_video_id.trim() !== '')
-            .map((t: any) => ({
-              videoId: t.youtube_video_id,
-              thumbnail: `https://img.youtube.com/vi/${t.youtube_video_id}/maxresdefault.jpg`,
-              track_title: t.track_title,
-              artist: t.artist,
-              vocalist: t.vocalist,
-              category: t.category,
-              start_time: Number(t.start_time),
-              end_time: Number(t.end_time),
-            }))
-        );
-        console.log('tracks:', tracks);
+        const parsedTracks = result.data
+          .filter((t: any) => t.youtube_video_id && t.youtube_video_id.trim() !== '')
+          .map((t: any) => ({
+            videoId: t.youtube_video_id,
+            thumbnail: `https://img.youtube.com/vi/${t.youtube_video_id}/maxresdefault.jpg`,
+            track_title: t.track_title,
+            artist: t.artist,
+            vocalist: t.vocalist,
+            category: t.category,
+            start_time: Number(t.start_time),
+            end_time: Number(t.end_time),
+          }));
+        setTracks(parsedTracks);
+        console.log('tracks:', parsedTracks);
+        
+        // プレイヤーが準備できていて、トラックがある場合は最初の動画を設定
+        if (playerRef.current && playerReady && parsedTracks.length > 0) {
+          const firstTrack = parsedTracks[0];
+          playerRef.current.loadVideoById({
+            videoId: firstTrack.videoId,
+            startSeconds: firstTrack.start_time,
+            endSeconds: firstTrack.end_time,
+          });
+        }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // プレイヤーが準備できたときに最初の動画を設定
+  useEffect(() => {
+    if (playerReady && tracks.length > 0 && playerRef.current) {
+      const firstTrack = tracks[0];
+      playerRef.current.loadVideoById({
+        videoId: firstTrack.videoId,
+        startSeconds: firstTrack.start_time,
+        endSeconds: firstTrack.end_time,
+      });
+    }
+  }, [playerReady, tracks]);
 
   useEffect(() => {
     function updateVideoHeight() {
       if (window.innerWidth >= 900 && videoAreaRef.current) {
         const width = videoAreaRef.current.offsetWidth;
         videoAreaRef.current.style.height = `${width * 9 / 16}px`;
+        videoAreaRef.current.style.paddingTop = '0'; // CSSのpadding-topを無効化
       } else if (videoAreaRef.current) {
         videoAreaRef.current.style.height = '';
+        videoAreaRef.current.style.paddingTop = '56.25%'; // モバイル時はCSSのpadding-topを使用
       }
     }
     window.addEventListener('resize', updateVideoHeight);
@@ -130,6 +153,24 @@ function App() {
     setTimeout(updateVideoHeight, 0);
     return () => window.removeEventListener('resize', updateVideoHeight);
   }, []);
+
+  // トラックが読み込まれた後にビデオ高さを再計算
+  useEffect(() => {
+    if (tracks.length > 0) {
+      setTimeout(() => {
+        if (videoAreaRef.current) {
+          if (window.innerWidth >= 900) {
+            const width = videoAreaRef.current.offsetWidth;
+            videoAreaRef.current.style.height = `${width * 9 / 16}px`;
+            videoAreaRef.current.style.paddingTop = '0';
+          } else {
+            videoAreaRef.current.style.height = '';
+            videoAreaRef.current.style.paddingTop = '56.25%';
+          }
+        }
+      }, 100);
+    }
+  }, [tracks]);
 
   // vocalist一覧を抽出（カンマ区切りも分割、重複除去）
   const vocalistSet = new Set<string>();
@@ -242,7 +283,18 @@ function App() {
 
   const currentTrack = filteredTracks[currentTrackIdx];
   if (!currentTrack) {
-    return <div>Loading...</div>;
+    return (
+      <div className="App" style={{ fontFamily: 'sans-serif', background: '#f9f9f9', height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <header>
+          <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '16px' }}>Speciale Music</span>
+        </header>
+        <div className="main-content" style={{flex: 1, minHeight: 0}}>
+          <div className="video-area" ref={videoAreaRef} style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', color: '#fff' }}>
+            <div>Loading...</div>
+          </div>
+        </div>
+      </div>
+    );
   }
   const duration = currentTrack.end_time - currentTrack.start_time;
 
