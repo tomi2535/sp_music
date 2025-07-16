@@ -28,31 +28,70 @@ function App() {
   const iframeContainerRef = useRef<HTMLDivElement>(null);
   const [ytReady, setYtReady] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [initAttempts, setInitAttempts] = useState(0);
+  const maxInitAttempts = 5;
 
   // YouTube IFrame APIの読み込み
   useEffect(() => {
+    console.log('YouTube API loading effect started');
     if (window.YT && window.YT.Player) {
+      console.log('YouTube API already loaded');
       setYtReady(true);
       return;
     }
+    console.log('Loading YouTube IFrame API...');
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
+    tag.onload = () => console.log('YouTube API script loaded');
+    tag.onerror = (error) => console.error('YouTube API script failed to load:', error);
     document.body.appendChild(tag);
     window.onYouTubeIframeAPIReady = () => {
+      console.log('YouTube IFrame API Ready callback fired');
       setYtReady(true);
     };
+    
+    // フォールバック: 一定時間後にYTオブジェクトをチェック
+    const fallbackCheck = setInterval(() => {
+      if (window.YT && window.YT.Player) {
+        console.log('YouTube API detected via fallback check');
+        clearInterval(fallbackCheck);
+        setYtReady(true);
+      }
+    }, 1000);
+    
+    // 10秒後にフォールバックチェックを停止
+    setTimeout(() => {
+      clearInterval(fallbackCheck);
+    }, 10000);
+    
     return () => {
+      console.log('Cleaning up YouTube API callback');
+      clearInterval(fallbackCheck);
       delete (window as any).onYouTubeIframeAPIReady;
     };
   }, []);
 
   // プレイヤー生成（1回だけ）
   useEffect(() => {
-    if (!ytReady || !iframeContainerRef.current) return;
-    if (playerRef.current) return;
+    console.log('Player initialization effect:', { ytReady, iframeContainerRef: !!iframeContainerRef.current, playerRef: !!playerRef.current, initAttempts });
+    if (!ytReady || !iframeContainerRef.current) {
+      console.log('Player initialization skipped:', { ytReady, iframeContainerRef: !!iframeContainerRef.current });
+      return;
+    }
+    if (playerRef.current) {
+      console.log('Player already exists, skipping initialization');
+      return;
+    }
+    if (initAttempts >= maxInitAttempts) {
+      console.log('Max initialization attempts reached');
+      return;
+    }
     
     // プレイヤー生成を少し遅延させてDOMの準備を確実にする
     const initPlayer = () => {
+      console.log('Attempting to initialize YouTube player... (attempt', initAttempts + 1, ')');
+      setInitAttempts(prev => prev + 1);
+      
       try {
         playerRef.current = new window.YT.Player(iframeContainerRef.current, {
           height: '100%',
@@ -71,6 +110,7 @@ function App() {
               setPlayerReady(true);
             },
             onStateChange: (event: any) => {
+              console.log('Player state changed:', event.data);
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
               }
@@ -79,7 +119,8 @@ function App() {
               console.log('YouTube Player Error:', event.data);
               // エラー時はプレイヤーを再初期化
               setTimeout(() => {
-                if (playerRef.current) {
+                if (playerRef.current && initAttempts < maxInitAttempts) {
+                  console.log('Retrying player initialization after error');
                   playerRef.current.destroy();
                   playerRef.current = null;
                   setPlayerReady(false);
@@ -89,10 +130,13 @@ function App() {
             },
           },
         });
+        console.log('YouTube Player initialization started');
       } catch (error) {
         console.error('Failed to initialize YouTube player:', error);
         // エラー時は再試行
-        setTimeout(initPlayer, 1000);
+        if (initAttempts < maxInitAttempts) {
+          setTimeout(initPlayer, 1000);
+        }
       }
     };
     
@@ -100,14 +144,28 @@ function App() {
     setTimeout(initPlayer, 100);
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ytReady]);
+  }, [ytReady, initAttempts]);
 
   useEffect(() => {
+    console.log('CSV loading effect started');
     fetch('/playlist.csv')
-      .then(res => res.text())
+      .then(res => {
+        console.log('CSV fetch response:', res.status, res.ok);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.text();
+      })
       .then(csvText => {
+        console.log('CSV text loaded, length:', csvText.length);
+        if (!csvText || csvText.trim().length === 0) {
+          throw new Error('CSV file is empty');
+        }
         const result = Papa.parse(csvText, { header: true });
         console.log('PapaParse result:', result.data);
+        if (!result.data || result.data.length === 0) {
+          throw new Error('No data found in CSV');
+        }
         const parsedTracks = result.data
           .filter((t: any) => t.youtube_video_id && t.youtube_video_id.trim() !== '')
           .map((t: any) => ({
@@ -120,11 +178,16 @@ function App() {
             start_time: Number(t.start_time),
             end_time: Number(t.end_time),
           }));
+        if (parsedTracks.length === 0) {
+          throw new Error('No valid tracks found in CSV');
+        }
         setTracks(parsedTracks);
         console.log('tracks loaded:', parsedTracks.length);
       })
       .catch(error => {
         console.error('Failed to load playlist:', error);
+        // エラー時は空の配列を設定してアプリが動作するようにする
+        setTracks([]);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -331,10 +394,56 @@ function App() {
               justifyContent: 'center', 
               background: '#000', 
               color: '#fff',
-              width: '100%'
+              width: '100%',
+              flexDirection: 'column',
+              gap: '16px'
             }}
           >
-            <div>Loading...</div>
+            {/* iframeContainerRefを常にレンダリング */}
+            <div 
+              ref={iframeContainerRef} 
+              style={{ 
+                width: '100%', 
+                height: '100%',
+                minHeight: '200px',
+                background: '#000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                flexDirection: 'column',
+                gap: '16px'
+              }}
+            >
+              <div>Loading...</div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                {!ytReady && 'YouTube APIを読み込み中...'}
+                {ytReady && !playerReady && 'プレイヤーを初期化中...'}
+                {playerReady && tracks.length === 0 && 'プレイリストを読み込み中...'}
+              </div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '8px' }}>
+                <div>ytReady: {ytReady ? '✓' : '✗'}</div>
+                <div>playerReady: {playerReady ? '✓' : '✗'}</div>
+                <div>tracks: {tracks.length}</div>
+                <div>initAttempts: {initAttempts}/{maxInitAttempts}</div>
+              </div>
+              {initAttempts >= maxInitAttempts && (
+                <button 
+                  onClick={() => window.location.reload()} 
+                  style={{
+                    padding: '8px 16px',
+                    background: '#61dafb',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  再読み込み
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
