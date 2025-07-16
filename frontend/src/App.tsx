@@ -2,21 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import Papa from 'papaparse';
 
-// sample_playlist.csvの内容を反映
-const csvTracks = [
-  { track_title: '雨とカプチーノ', artist: 'ヨルシカ', youtube_video_id: '_6DnZ8QQehA', start_time: 0, end_time: 270 },
-  { track_title: 'Yummy Yummy Yummy', artist: 'FAKE TYPE', youtube_video_id: 'qSaaaTqOsvU', start_time: 0, end_time: 169 },
-  { track_title: '明日も', artist: 'SHISHAMO', youtube_video_id: 'PKEbUUPNi3I', start_time: 0, end_time: 365 },
-  { track_title: '小さな恋のうた', artist: 'MONGOL800', youtube_video_id: 'Al2hm6tlsII', start_time: 0, end_time: 219 },
-  { track_title: 'きゅうくらりん', artist: 'いよわ feat.可不 ', youtube_video_id: 'vSr8PqrXRHc', start_time: 0, end_time: 216 },
-  { track_title: 'Mr. Showtime', artist: 'ワンダーランズ×ショウタイム × 巡音ルカ', youtube_video_id: 'xGxZVVRQ3Qs', start_time: 0, end_time: 230 },
-  { track_title: 'Mr. Music', artist: 'れるりり', youtube_video_id: 'BTFo78i4rJo', start_time: 56, end_time: 324 },
-  { track_title: 'Climax Jump', artist: 'AAA', youtube_video_id: 'BTFo78i4rJo', start_time: 536, end_time: 775 },
-  { track_title: 'くっきんどりーみんらんど', artist: 'Speciale', youtube_video_id: 'v5ebL2NFJU0', start_time: 0, end_time: 232 },
-  { track_title: 'シュガーソングとビターステップ', artist: 'UNISON SQUARE GARDEN', youtube_video_id: 'u7h7UL9cR_g', start_time: 0, end_time: 255 },
-  { track_title: 'にっこり^^調査隊のテーマ', artist: 'Speciale', youtube_video_id: 'GKCyuUkI7mI', start_time: 0, end_time: 207 },
-];
-
 declare global {
   interface Window {
     YT: any;
