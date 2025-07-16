@@ -113,6 +113,7 @@ function App() {
         );
         console.log('tracks:', tracks);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
