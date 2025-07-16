@@ -83,6 +83,9 @@ function App() {
             setIsPlaying(false);
           }
         },
+        onError: (event: any) => {
+          console.log('YouTube Player Error:', event.data);
+        },
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
