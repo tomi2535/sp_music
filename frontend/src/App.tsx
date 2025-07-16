@@ -126,16 +126,26 @@ function App() {
     function updateVideoHeight() {
       if (window.innerWidth >= 900 && videoAreaRef.current) {
         const width = videoAreaRef.current.offsetWidth;
-        videoAreaRef.current.style.height = `${width * 9 / 16}px`;
-        videoAreaRef.current.style.paddingTop = '0'; // CSSのpadding-topを無効化
+        if (width > 0) {
+          const height = width * 9 / 16;
+          videoAreaRef.current.style.height = `${height}px`;
+          videoAreaRef.current.style.paddingTop = '0';
+        } else {
+          // 幅が取得できない場合はデフォルト高さを設定
+          videoAreaRef.current.style.height = '400px';
+          videoAreaRef.current.style.paddingTop = '0';
+        }
       } else if (videoAreaRef.current) {
         videoAreaRef.current.style.height = '';
-        videoAreaRef.current.style.paddingTop = '56.25%'; // モバイル時はCSSのpadding-topを使用
+        videoAreaRef.current.style.paddingTop = '56.25%';
       }
     }
     window.addEventListener('resize', updateVideoHeight);
     updateVideoHeight();
+    // 複数回実行して確実に高さを設定
     setTimeout(updateVideoHeight, 0);
+    setTimeout(updateVideoHeight, 100);
+    setTimeout(updateVideoHeight, 500);
     return () => window.removeEventListener('resize', updateVideoHeight);
   }, []);
 
@@ -146,8 +156,14 @@ function App() {
         if (videoAreaRef.current) {
           if (window.innerWidth >= 900) {
             const width = videoAreaRef.current.offsetWidth;
-            videoAreaRef.current.style.height = `${width * 9 / 16}px`;
-            videoAreaRef.current.style.paddingTop = '0';
+            if (width > 0) {
+              const height = width * 9 / 16;
+              videoAreaRef.current.style.height = `${height}px`;
+              videoAreaRef.current.style.paddingTop = '0';
+            } else {
+              videoAreaRef.current.style.height = '400px';
+              videoAreaRef.current.style.paddingTop = '0';
+            }
           } else {
             videoAreaRef.current.style.height = '';
             videoAreaRef.current.style.paddingTop = '56.25%';
@@ -274,7 +290,19 @@ function App() {
           <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '16px' }}>Speciale Music</span>
         </header>
         <div className="main-content" style={{flex: 1, minHeight: 0}}>
-          <div className="video-area" ref={videoAreaRef} style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', color: '#fff' }}>
+          <div 
+            className="video-area" 
+            ref={videoAreaRef} 
+            style={{ 
+              minHeight: window.innerWidth >= 900 ? '400px' : '200px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              background: '#000', 
+              color: '#fff',
+              width: '100%'
+            }}
+          >
             <div>Loading...</div>
           </div>
         </div>
