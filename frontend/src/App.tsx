@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import Papa from 'papaparse';
 
 // sample_playlist.csvの内容を反映
 const csvTracks = [
@@ -91,17 +92,18 @@ function App() {
   }, [ytReady]);
 
   useEffect(() => {
-    fetch('/api/playlists')
-      .then(res => res.json())
-      .then(data => {
+    fetch('/playlist.csv')
+      .then(res => res.text())
+      .then(csvText => {
+        const result = Papa.parse(csvText, { header: true });
         setTracks(
-          data.map((t: any) => ({
+          result.data.map((t: any) => ({
             videoId: t.youtube_video_id,
             thumbnail: `https://img.youtube.com/vi/${t.youtube_video_id}/maxresdefault.jpg`,
             track_title: t.track_title,
             artist: t.artist,
             vocalist: t.vocalist,
-            category: t.category, // カテゴリを追加
+            category: t.category,
             start_time: Number(t.start_time),
             end_time: Number(t.end_time),
           }))
