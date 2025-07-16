@@ -16,14 +16,18 @@ const csvTracks = [
   { track_title: 'にっこり^^調査隊のテーマ', artist: 'Speciale', youtube_video_id: 'GKCyuUkI7mI', start_time: 0, end_time: 207 },
 ];
 
-// tracks配列はAPIから取得
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
 function App() {
   const [tracks, setTracks] = useState<any[]>([]);
   const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
-  const [autoplay, setAutoplay] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 区間内の再生位置（秒）
-  const [iframeKey, setIframeKey] = useState(0); // iframe再生成用
   const [seekedProgress, setSeekedProgress] = useState<number | null>(null); // シーク確定用
   const [showFilter, setShowFilter] = useState(false);
   const [selectedVocalist, setSelectedVocalist] = useState<string>('');
@@ -35,6 +39,54 @@ function App() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
+  const iframeContainerRef = useRef<HTMLDivElement>(null);
+  const [ytReady, setYtReady] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+
+  // YouTube IFrame APIの読み込み
+  useEffect(() => {
+    if (window.YT && window.YT.Player) {
+      setYtReady(true);
+      return;
+    }
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.body.appendChild(tag);
+    window.onYouTubeIframeAPIReady = () => {
+      setYtReady(true);
+    };
+    return () => {
+      delete (window as any).onYouTubeIframeAPIReady;
+    };
+  }, []);
+
+  // プレイヤー生成（1回だけ）
+  useEffect(() => {
+    if (!ytReady || !iframeContainerRef.current) return;
+    if (playerRef.current) return;
+    playerRef.current = new window.YT.Player(iframeContainerRef.current, {
+      height: '100%',
+      width: '100%',
+      videoId: csvTracks[0].youtube_video_id,
+      playerVars: {
+        controls: 1,
+        rel: 0,
+        playsinline: 1,
+      },
+      events: {
+        onReady: () => {
+          setPlayerReady(true);
+        },
+        onStateChange: (event: any) => {
+          if (event.data === window.YT.PlayerState.ENDED) {
+            setIsPlaying(false);
+          }
+        },
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ytReady]);
 
   useEffect(() => {
     fetch('/api/playlists')
@@ -97,7 +149,6 @@ function App() {
   useEffect(() => {
     setProgress(0);
     setSeekedProgress(null);
-    setIframeKey((k) => k + 1); // iframe再生成
   }, [currentTrackIdx]);
 
   // ランダムで次のインデックスを取得（現在の曲以外）
@@ -120,24 +171,48 @@ function App() {
     const remain = (duration - progress) * 1000;
     timeoutRef.current = setTimeout(() => {
       if (isRepeat) {
-        // 一度停止→再生でYouTube埋め込みの自動再生を確実にする
         setIsPlaying(false);
         setTimeout(() => {
           setProgress(0);
           setSeekedProgress(null);
-          setIframeKey(k => k + 1); // iframe再生成
-          setIsPlaying(true);
-          setAutoplay(true);
-        }, 100); // 100ms遅延
+          // リピート時はloadVideoByIdで再生
+          if (playerRef.current && playerReady) {
+            playerRef.current.loadVideoById({
+              videoId: currentTrack.videoId,
+              startSeconds: currentTrack.start_time,
+              endSeconds: currentTrack.end_time,
+            });
+            playerRef.current.playVideo();
+            setIsPlaying(true);
+          }
+        }, 100);
       } else if (isRandom) {
-        setCurrentTrackIdx(getRandomIndex());
-        setAutoplay(true);
-        setIsPlaying(true);
+        const nextIdx = getRandomIndex();
+        setCurrentTrackIdx(nextIdx);
+        if (playerRef.current && playerReady) {
+          const nextTrack = filteredTracks[nextIdx];
+          playerRef.current.loadVideoById({
+            videoId: nextTrack.videoId,
+            startSeconds: nextTrack.start_time,
+            endSeconds: nextTrack.end_time,
+          });
+          playerRef.current.playVideo();
+          setIsPlaying(true);
+        }
         setProgress(0);
       } else if (currentTrackIdx < filteredTracks.length - 1) {
-        setCurrentTrackIdx(currentTrackIdx + 1);
-        setAutoplay(true);
-        setIsPlaying(true);
+        const nextIdx = currentTrackIdx + 1;
+        setCurrentTrackIdx(nextIdx);
+        if (playerRef.current && playerReady) {
+          const nextTrack = filteredTracks[nextIdx];
+          playerRef.current.loadVideoById({
+            videoId: nextTrack.videoId,
+            startSeconds: nextTrack.start_time,
+            endSeconds: nextTrack.end_time,
+          });
+          playerRef.current.playVideo();
+          setIsPlaying(true);
+        }
         setProgress(0);
       } else {
         setIsPlaying(false); // 最後の動画で止める
@@ -156,7 +231,7 @@ function App() {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrackIdx, filteredTracks, isPlaying, progress, isRandom, isRepeat]);
+  }, [currentTrackIdx, filteredTracks, isPlaying, progress, isRandom, isRepeat, playerReady]);
 
   const currentTrack = filteredTracks[currentTrackIdx];
   if (!currentTrack) {
@@ -164,53 +239,97 @@ function App() {
   }
   const duration = currentTrack.end_time - currentTrack.start_time;
 
-  // YouTube埋め込みURL生成
-  const getYoutubeUrl = () => {
-    let url = `https://www.youtube.com/embed/${currentTrack.videoId}`;
-    const params = [];
-    params.push('controls=0'); // UI非表示
-    if (isPlaying) params.push('autoplay=1');
-    // シーク確定時はseekedProgressを使う
-    const seek = seekedProgress !== null ? seekedProgress : 0;
-    if (currentTrack.start_time !== undefined) params.push(`start=${currentTrack.start_time + Math.floor(seek)}`);
-    if (currentTrack.end_time !== undefined) params.push(`end=${currentTrack.end_time}`);
-    if (params.length > 0) url += '?' + params.join('&');
-    return url;
+  // duration補正用の関数
+  const getSafeEndTime = async (track: any) => {
+    if (playerRef.current && playerReady) {
+      let duration = 0;
+      try {
+        duration = await playerRef.current.getDuration();
+      } catch (e) {}
+      if (typeof duration === 'number' && duration > 0) {
+        return Math.min(track.end_time, duration);
+      }
+    }
+    return track.end_time;
   };
 
   // 再生・一時停止
   const handlePlay = () => {
-    setIsPlaying(true);
-    setAutoplay(true);
+    if (playerRef.current && playerReady) {
+      playerRef.current.playVideo();
+      setIsPlaying(true);
+    }
   };
   const handlePause = () => {
-    setIsPlaying(false);
-    setAutoplay(false);
+    if (playerRef.current && playerReady) {
+      playerRef.current.pauseVideo();
+      setIsPlaying(false);
+    }
   };
   // 次・前
-  const handleNext = () => {
+  const handleNext = async () => {
     if (isRandom) {
-      setCurrentTrackIdx(getRandomIndex());
-      setAutoplay(true);
-      setIsPlaying(true);
+      const nextIdx = getRandomIndex();
+      setCurrentTrackIdx(nextIdx);
+      if (playerRef.current && playerReady) {
+        const nextTrack = filteredTracks[nextIdx];
+        const safeEnd = await getSafeEndTime(nextTrack);
+        playerRef.current.loadVideoById({
+          videoId: nextTrack.videoId,
+          startSeconds: nextTrack.start_time,
+          endSeconds: safeEnd,
+        });
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
       setProgress(0);
     } else if (currentTrackIdx < filteredTracks.length - 1) {
-      setCurrentTrackIdx(currentTrackIdx + 1);
-      setAutoplay(true);
-      setIsPlaying(true);
+      const nextIdx = currentTrackIdx + 1;
+      setCurrentTrackIdx(nextIdx);
+      if (playerRef.current && playerReady) {
+        const nextTrack = filteredTracks[nextIdx];
+        const safeEnd = await getSafeEndTime(nextTrack);
+        playerRef.current.loadVideoById({
+          videoId: nextTrack.videoId,
+          startSeconds: nextTrack.start_time,
+          endSeconds: safeEnd,
+        });
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
       setProgress(0);
     }
   };
-  const handlePrev = () => {
+  const handlePrev = async () => {
     if (isRandom) {
-      setCurrentTrackIdx(getRandomIndex());
-      setAutoplay(true);
-      setIsPlaying(true);
+      const prevIdx = getRandomIndex();
+      setCurrentTrackIdx(prevIdx);
+      if (playerRef.current && playerReady) {
+        const prevTrack = filteredTracks[prevIdx];
+        const safeEnd = await getSafeEndTime(prevTrack);
+        playerRef.current.loadVideoById({
+          videoId: prevTrack.videoId,
+          startSeconds: prevTrack.start_time,
+          endSeconds: safeEnd,
+        });
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
       setProgress(0);
     } else if (currentTrackIdx > 0) {
-      setCurrentTrackIdx(currentTrackIdx - 1);
-      setAutoplay(true);
-      setIsPlaying(true);
+      const prevIdx = currentTrackIdx - 1;
+      setCurrentTrackIdx(prevIdx);
+      if (playerRef.current && playerReady) {
+        const prevTrack = filteredTracks[prevIdx];
+        const safeEnd = await getSafeEndTime(prevTrack);
+        playerRef.current.loadVideoById({
+          videoId: prevTrack.videoId,
+          startSeconds: prevTrack.start_time,
+          endSeconds: safeEnd,
+        });
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
       setProgress(0);
     }
   };
@@ -220,20 +339,40 @@ function App() {
     setProgress(Number(e.target.value));
   };
   // シーク確定時（マウス離し/タッチ離し）
-  const handleSeekCommit = () => {
-    setSeekedProgress(progress);
-    setIframeKey((k) => k + 1); // iframe再生成
-    setAutoplay(true);
-    setIsPlaying(true);
+  const handleSeekCommit = async () => {
+    if (playerRef.current && playerReady && currentTrack) {
+      const seekTo = currentTrack.start_time + progress;
+      const safeEnd = await getSafeEndTime(currentTrack);
+      playerRef.current.loadVideoById({
+        videoId: currentTrack.videoId,
+        startSeconds: seekTo,
+        endSeconds: safeEnd,
+      });
+      playerRef.current.playVideo();
+      setIsPlaying(true);
+      setSeekedProgress(null);
+    }
     // タイマー再設定
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    const duration = currentTrack.end_time - currentTrack.start_time;
     const remain = (duration - progress) * 1000;
     timeoutRef.current = setTimeout(() => {
       if (currentTrackIdx < filteredTracks.length - 1) {
-        setCurrentTrackIdx(currentTrackIdx + 1);
-        setAutoplay(true);
-        setIsPlaying(true);
+        const nextIdx = currentTrackIdx + 1;
+        setCurrentTrackIdx(nextIdx);
+        if (playerRef.current && playerReady) {
+          const nextTrack = filteredTracks[nextIdx];
+          getSafeEndTime(nextTrack).then(safeEnd => {
+            playerRef.current.loadVideoById({
+              videoId: nextTrack.videoId,
+              startSeconds: nextTrack.start_time,
+              endSeconds: safeEnd,
+            });
+            playerRef.current.playVideo();
+            setIsPlaying(true);
+          });
+        }
         setProgress(0);
         setSeekedProgress(null);
       } else {
@@ -252,10 +391,19 @@ function App() {
   };
 
   // リストクリック
-  const handleTrackClick = (idx: number) => {
+  const handleTrackClick = async (idx: number) => {
     setCurrentTrackIdx(idx);
-    setAutoplay(true);
-    setIsPlaying(true);
+    if (playerRef.current && playerReady) {
+      const track = filteredTracks[idx];
+      const safeEnd = await getSafeEndTime(track);
+      playerRef.current.loadVideoById({
+        videoId: track.videoId,
+        startSeconds: track.start_time,
+        endSeconds: safeEnd,
+      });
+      playerRef.current.playVideo();
+      setIsPlaying(true);
+    }
     setProgress(0);
     setSeekedProgress(null);
   };
@@ -351,27 +499,7 @@ function App() {
       {/* Youtube動画 */}
       <div className="main-content" style={{flex: 1, minHeight: 0}}>
         <div className="video-area" ref={videoAreaRef}>
-          {isPlaying ? (
-            <iframe
-              key={iframeKey}
-              width="100%"
-              height="100%"
-              src={getYoutubeUrl()}
-              title="YouTube video"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ display: 'block', width: '100%', height: '100%' }}
-            />
-          ) : (
-            <div className="video-thumbnail-wrapper">
-              <img
-                src={currentTrack.thumbnail}
-                alt={currentTrack.track_title}
-                className="video-thumbnail"
-              />
-            </div>
-          )}
+          <div ref={iframeContainerRef} style={{ width: '100%', height: '100%' }} />
         </div>
         <div className="list-area">
           {filteredTracks.map((track, idx) => (
