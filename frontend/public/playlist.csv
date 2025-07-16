@@ -1,18 +1,43 @@
 playlist_name,playlist_description,track_title,artist,vocalist,youtube_video_id,start_time,end_time,category
-test,test,雨とカプチーノ,ヨルシカ,早乙女ベリー,_6DnZ8QQehA,0,270,utamita
-test,test,Yummy Yummy Yummy,FAKE TYPE,渚トラウト,qSaaaTqOsvU,0,169,utamita
-test,test,明日も,SHISHAMO,七瀬すず菜,PKEbUUPNi3I,0,365,utamita
-test,test,小さな恋のうた,MONGOL800,酒寄颯馬,Al2hm6tlsII,0,219,utamita
-test,test,きゅうくらりん,いよわ feat.可不 ,雲母たまこ,vSr8PqrXRHc,0,216,utamita
-test,test,Mr. Showtime,ワンダーランズ×ショウタイム × 巡音ルカ,Speciale,xGxZVVRQ3Qs,0,230,utamita
 test,test,くっきんどりーみんらんど,Speciale,Speciale,v5ebL2NFJU0,0,232,original
+test,test,Mr. Showtime,ワンダーランズ×ショウタイム × 巡音ルカ,Speciale,xGxZVVRQ3Qs,0,230,utamita
 test,test,シュガーソングとビターステップ,UNISON SQUARE GARDEN,Speciale,u7h7UL9cR_g,0,255,utamita
-test,test,にっこり^^調査隊のテーマ,,Speciale,GKCyuUkI7mI,0,207,utamita
-test,test,God knows…,,早乙女ベリー,L-Dd4MsA_MM,0,280,utawaku
-test,test,ワールドイズマイン,,早乙女ベリー,migRSqMc2eI,0,257,utawaku
-test,test,スキスキ絶頂症,,早乙女ベリー,3T4C0m8bN3Y,0,214,utawaku
+test,test,にっこり^^調査隊のテーマ,ワンダーランズ×ショウタイム,Speciale,GKCyuUkI7mI,0,207,utamita
+test,test,明日も,SHISHAMO,七瀬すず菜,PKEbUUPNi3I,0,365,utamita
+test,test,Iなんです, 25時、ナイトコードで。 × 初音ミク  ,"七瀬すず菜,早乙女ベリー",l2bdTAXnwIc,0,148,utamita
+test,test,金曜日のおはよう,HoneyWorks feat.Gero  ,七瀬すず菜,KODwmaVh7tw,0,241,utamita
+test,test,Booo!,TOKOTOKO（西沢さんP）,七瀬すず菜,QJwNMOA_174,0,173,utamita
+test,test,スイートマジック,ろん×Junky  ,七瀬すず菜,kIahEyrR6c4,0,216,utamita
+test,test,雨とカプチーノ,ヨルシカ,早乙女ベリー,_6DnZ8QQehA,0,270,utamita
+test,test,God knows…,涼宮ハルヒ(CV:平野綾),早乙女ベリー,L-Dd4MsA_MM,0,280,utamita
+test,test,スキスキ絶頂症,koyori(電ポルP),早乙女ベリー,3T4C0m8bN3Y,0,214,utamita
+test,test,ツインテールは20歳まで♡,きゅるりんってしてみて  ,早乙女ベリー,IIVlhMofUUk,0,200,utamita
+test,test,メイド☆至上主義,HoneyWorks,"七瀬すず菜,早乙女ベリー,雲母たまこ",oMqNleb1roQ,0,146,utamita
+test,test,ワールドイズマイン,ryo,早乙女ベリー,migRSqMc2eI,0,257,utamita
+test,test,きゅうくらりん,いよわ feat.可不 ,雲母たまこ,vSr8PqrXRHc,0,216,utamita
+test,test,Baby Sweet Berry Love,小倉唯,雲母たまこ,pyoI3fh1KSs,0,244,utamita
+test,test,だいしきゅーだいしゅき,femme fatale,雲母たまこ,U-26dr0TCaw,0,210,utamita
+test,test,小さな恋のうた,MONGOL800,酒寄颯馬,Al2hm6tlsII,0,219,utamita
+test,test,Yummy Yummy Yummy,FAKE TYPE,渚トラウト,qSaaaTqOsvU,0,169,utamita
+test,test,アトラクトライト (Attract Light),*Luna,渚トラウト,XHGbyPNRJ98,0,272,utamita
+test,test,Gimme × Gimme,八王子P × Giga,"早乙女ベリー,渚トラウト",Q6QQ7_8iS0M,0,219,utamita
+test,test,無題1,渚トラウト,渚トラウト,FBYCsB7i3rs,0,94,original
+test,test,フライデー･ナイト,なとり,渚トラウト,ZuWzbZG6Rf8,0,178,utamita
+test,test,少女レイ,みきとP,七瀬すず菜,yCsHIezujbM,0,289,utamita
 test,test,Mr. Music,れるりり,"七瀬すず菜,早乙女ベリー,雲母たまこ,酒寄颯馬,渚トラウト",BTFo78i4rJo,56,324,utawaku
 test,test,Climax Jump,AAA,"七瀬すず菜,酒寄颯馬,渚トラウト",BTFo78i4rJo,536,775,utawaku
 test,test,わたし、魔法使い,＝LOVE,"早乙女ベリー,雲母たまこ",BTFo78i4rJo,902,1110,utawaku
 test,test,バニー,すりぃ,七瀬すず菜,BTFo78i4rJo,1241,1428,utawaku
 test,test,帰り道,八九寺真宵,雲母たまこ,BTFo78i4rJo,1591,1838,utawaku
+test,test,ぼなぺてぃーと♡S,,"七瀬すず菜,早乙女ベリー,雲母たまこ",BTFo78i4rJo,1979,2233,utawaku
+test,test,knickknack kingdom,,渚トラウト,BTFo78i4rJo,2376,2560,utawaku
+test,test,マーシャル・マキシマイザー,,"七瀬すず菜,早乙女ベリー",BTFo78i4rJo,2719,2887,utawaku
+test,test,ロミオとシンデレラ,,酒寄颯馬,BTFo78i4rJo,3021,3305,utawaku
+test,test,ワールズエンドダンスホール,,"早乙女ベリー,渚トラウト",BTFo78i4rJo,3467,3675,utawaku
+test,test,フィクサー,,"酒寄颯馬,渚トラウト",BTFo78i4rJo,3856,4098,utawaku
+test,test,SOMEONE ELSE,,"七瀬すず菜,早乙女ベリー,雲母たまこ",BTFo78i4rJo,4233,4512,utawaku
+test,test,ロメオ,,"酒寄颯馬,渚トラウト",BTFo78i4rJo,5066,5278,utawaku
+test,test,ヒトリゴト,,"七瀬すず菜,雲母たまこ",BTFo78i4rJo,5489,5722,utawaku
+test,test,ハッピーシンセサイザ,,"雲母たまこ,酒寄颯馬",BTFo78i4rJo,5875,6107,utawaku
+test,test,Catch the Moment,,早乙女ベリー,BTFo78i4rJo,6247,6528,utawaku
+test,test,Wonder NeverLand,,"七瀬すず菜,早乙女ベリー,雲母たまこ,酒寄颯馬,渚トラウト",BTFo78i4rJo,6705,6978,utawaku
