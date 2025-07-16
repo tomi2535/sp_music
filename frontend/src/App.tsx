@@ -128,7 +128,7 @@ function App() {
     updateVideoHeight();
     setTimeout(updateVideoHeight, 0);
     return () => window.removeEventListener('resize', updateVideoHeight);
-  }, [tracks]);
+  }, []);
 
   // vocalist一覧を抽出（カンマ区切りも分割、重複除去）
   const vocalistSet = new Set<string>();
