@@ -28,7 +28,6 @@ function App() {
   const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 区間内の再生位置（秒）
-  const [seekedProgress, setSeekedProgress] = useState<number | null>(null); // シーク確定用
   const [showFilter, setShowFilter] = useState(false);
   const [selectedVocalist, setSelectedVocalist] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -151,7 +150,6 @@ function App() {
   // トラック切り替え時や停止時にprogressリセット
   useEffect(() => {
     setProgress(0);
-    setSeekedProgress(null);
   }, [currentTrackIdx]);
 
   // ランダムで次のインデックスを取得（現在の曲以外）
@@ -177,7 +175,6 @@ function App() {
         setIsPlaying(false);
         setTimeout(() => {
           setProgress(0);
-          setSeekedProgress(null);
           // リピート時はloadVideoByIdで再生
           if (playerRef.current && playerReady) {
             playerRef.current.loadVideoById({
@@ -353,7 +350,6 @@ function App() {
       });
       playerRef.current.playVideo();
       setIsPlaying(true);
-      setSeekedProgress(null);
     }
     // タイマー再設定
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -377,11 +373,9 @@ function App() {
           });
         }
         setProgress(0);
-        setSeekedProgress(null);
       } else {
         setIsPlaying(false); // 最後の動画で止める
         setProgress(0);
-        setSeekedProgress(null);
       }
     }, remain);
     // シークバー用インターバル
@@ -408,7 +402,6 @@ function App() {
       setIsPlaying(true);
     }
     setProgress(0);
-    setSeekedProgress(null);
   };
 
   return (
