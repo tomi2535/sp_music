@@ -96,18 +96,22 @@ function App() {
       .then(res => res.text())
       .then(csvText => {
         const result = Papa.parse(csvText, { header: true });
+        console.log('PapaParse result:', result.data);
         setTracks(
-          result.data.map((t: any) => ({
-            videoId: t.youtube_video_id,
-            thumbnail: `https://img.youtube.com/vi/${t.youtube_video_id}/maxresdefault.jpg`,
-            track_title: t.track_title,
-            artist: t.artist,
-            vocalist: t.vocalist,
-            category: t.category,
-            start_time: Number(t.start_time),
-            end_time: Number(t.end_time),
-          }))
+          result.data
+            .filter((t: any) => t.youtube_video_id && t.youtube_video_id.trim() !== '')
+            .map((t: any) => ({
+              videoId: t.youtube_video_id,
+              thumbnail: `https://img.youtube.com/vi/${t.youtube_video_id}/maxresdefault.jpg`,
+              track_title: t.track_title,
+              artist: t.artist,
+              vocalist: t.vocalist,
+              category: t.category,
+              start_time: Number(t.start_time),
+              end_time: Number(t.end_time),
+            }))
         );
+        console.log('tracks:', tracks);
       });
   }, []);
 
