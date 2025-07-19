@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import Papa from 'papaparse';
 import { announcements } from './announcement';
@@ -41,19 +41,6 @@ function App() {
   const [playerReady, setPlayerReady] = useState(false);
   const [initAttempts, setInitAttempts] = useState(0);
   const maxInitAttempts = 5;
-
-  // YouTubeプレイヤーの状態名を取得するヘルパー関数
-  const getStateName = (state: number) => {
-    if (!window.YT) return 'Unknown';
-    switch (state) {
-      case window.YT.PlayerState.ENDED: return 'ENDED';
-      case window.YT.PlayerState.PLAYING: return 'PLAYING';
-      case window.YT.PlayerState.PAUSED: return 'PAUSED';
-      case window.YT.PlayerState.BUFFERING: return 'BUFFERING';
-      case window.YT.PlayerState.CUED: return 'CUED';
-      default: return 'UNKNOWN';
-    }
-  };
 
   // フィルタ適用
   const filteredTracks = tracks.filter(t => {
@@ -200,17 +187,6 @@ function App() {
               
               // 最新のcurrentTrackIdxを取得
               const latestCurrentTrackIdx = currentTrackIdxRef.current;
-              const currentTrackTitle = currentFilteredTracks[latestCurrentTrackIdx]?.track_title;
-              
-              // 実際にプレイヤーに読み込まれている動画の情報を取得
-              let actualVideoId = 'unknown';
-              try {
-                if (playerRef.current) {
-                  actualVideoId = playerRef.current.getVideoData()?.video_id || 'unknown';
-                }
-              } catch (e) {
-                actualVideoId = 'error';
-              }
               
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
@@ -220,7 +196,6 @@ function App() {
                     // リピート時は同じ曲を再生
                     const currentTrack = currentFilteredTracks[latestCurrentTrackIdx];
                     if (playerRef.current && playerReadyRef.current && currentTrack) {
-                      const safeEnd = await getSafeEndTime(currentTrack);
                       try {
                         playerRef.current.loadVideoById({
                           videoId: currentTrack.videoId,
@@ -239,7 +214,6 @@ function App() {
                     setCurrentTrackIdx(nextIdx);
                     if (playerRef.current && playerReadyRef.current) {
                       const nextTrack = currentFilteredTracks[nextIdx];
-                      const safeEnd = await getSafeEndTime(nextTrack);
                       try {
                         playerRef.current.loadVideoById({
                           videoId: nextTrack.videoId,
@@ -257,7 +231,6 @@ function App() {
                     const nextIdx = latestCurrentTrackIdx + 1;
                     if (playerRef.current && playerReadyRef.current) {
                       const nextTrack = currentFilteredTracks[nextIdx];
-                      const safeEnd = await getSafeEndTime(nextTrack);
                       try {
                         // endSecondsを指定せずに動画を読み込み
                         playerRef.current.loadVideoById({
@@ -278,6 +251,7 @@ function App() {
                               try {
                                 if (playerRef.current && playerReadyRef.current) {
                                   const currentTime = playerRef.current.getCurrentTime();
+                                  const safeEnd = nextTrack.end_time;
                                   if (currentTime >= safeEnd) {
                                     clearInterval(checkEndTime);
                                     playerRef.current.pauseVideo();
@@ -494,7 +468,7 @@ function App() {
     }, 200);
     
     return () => clearTimeout(timer);
-  }, [currentTrackIdx]);
+  }, [currentTrackIdx, isUserScrolling]);
 
   // isRepeatとisRandomの変更をrefに反映
   useEffect(() => {
@@ -532,7 +506,7 @@ function App() {
   };
 
   // 選択されている楽曲をスクロール範囲内の先頭に表示
-  const scrollToCurrentTrack = () => {
+  const scrollToCurrentTrack = useCallback(() => {
     console.log('scrollToCurrentTrack called, currentTrackIdx:', currentTrackIdx, 'isUserScrolling:', isUserScrolling);
     if (!listAreaRef.current) {
       console.log('listAreaRef.current is null');
@@ -556,7 +530,7 @@ function App() {
     } else {
       console.log('Selected element not found');
     }
-  };
+  }, [currentTrackIdx, isUserScrolling]);
 
   // 再生区間が終わったら次の動画へ
   useEffect(() => {
