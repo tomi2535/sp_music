@@ -21,6 +21,7 @@ function App() {
   const [pendingVocalist, setPendingVocalist] = useState<string>('');
   const [isRandom, setIsRandom] = useState(false); // ランダム再生ON/OFF
   const [isRepeat, setIsRepeat] = useState(false); // リピート再生ON/OFF
+  const [isSeeking, setIsSeeking] = useState(false); // シーク中かどうかのフラグ
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,7 @@ function App() {
             playsinline: 1,
             modestbranding: 1,
             showinfo: 0,
+            autoplay: 0, // 自動再生を無効化
           },
           events: {
             onReady: () => {
@@ -112,6 +114,10 @@ function App() {
             onStateChange: (event: any) => {
               console.log('Player state changed:', event.data);
               if (event.data === window.YT.PlayerState.ENDED) {
+                setIsPlaying(false);
+              } else if (event.data === window.YT.PlayerState.PLAYING) {
+                setIsPlaying(true);
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
                 setIsPlaying(false);
               }
             },
@@ -202,12 +208,13 @@ function App() {
       setTimeout(() => {
         if (playerRef.current && playerReady) {
           try {
-            playerRef.current.loadVideoById({
+            // 自動再生を防ぐため、cueVideoByIdを使用（再生せずに読み込みのみ）
+            playerRef.current.cueVideoById({
               videoId: firstTrack.videoId,
               startSeconds: firstTrack.start_time,
               endSeconds: firstTrack.end_time,
             });
-            console.log('First video loaded successfully');
+            console.log('First video loaded successfully (paused)');
           } catch (error) {
             console.error('Failed to load first video:', error);
           }
@@ -364,10 +371,22 @@ function App() {
     }, remain);
     // シークバー用インターバル
     progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev + 0.2 >= duration) return duration;
-        return prev + 0.2;
-      });
+      if (playerRef.current && filteredTracks[currentTrackIdx] && !isSeeking) {
+        try {
+          const currentTime = playerRef.current.getCurrentTime();
+          const currentTrack = filteredTracks[currentTrackIdx];
+          const videoStartTime = currentTrack.start_time;
+          const relativeTime = Math.max(0, currentTime - videoStartTime);
+          const trackDuration = currentTrack.end_time - currentTrack.start_time;
+          
+          // 相対時間がトラックの範囲内の場合のみ更新
+          if (relativeTime >= 0 && relativeTime <= trackDuration) {
+            setProgress(relativeTime);
+          }
+        } catch (error) {
+          console.log('Failed to sync progress:', error);
+        }
+      }
     }, 200);
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -548,6 +567,7 @@ function App() {
 
   // シークバー操作
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsSeeking(true); // シーク開始
     setProgress(Number(e.target.value));
   };
   // シーク確定時（マウス離し/タッチ離し）
@@ -563,6 +583,12 @@ function App() {
       playerRef.current.playVideo();
       setIsPlaying(true);
     }
+    
+    // シーク完了後、少し遅延させてからシークフラグを解除
+    setTimeout(() => {
+      setIsSeeking(false);
+    }, 500);
+    
     // タイマー再設定
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -592,10 +618,22 @@ function App() {
     }, remain);
     // シークバー用インターバル
     progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev + 0.2 >= duration) return duration;
-        return prev + 0.2;
-      });
+      if (playerRef.current && filteredTracks[currentTrackIdx] && !isSeeking) {
+        try {
+          const currentTime = playerRef.current.getCurrentTime();
+          const currentTrack = filteredTracks[currentTrackIdx];
+          const videoStartTime = currentTrack.start_time;
+          const relativeTime = Math.max(0, currentTime - videoStartTime);
+          const trackDuration = currentTrack.end_time - currentTrack.start_time;
+          
+          // 相対時間がトラックの範囲内の場合のみ更新
+          if (relativeTime >= 0 && relativeTime <= trackDuration) {
+            setProgress(relativeTime);
+          }
+        } catch (error) {
+          console.log('Failed to sync progress:', error);
+        }
+      }
     }, 200);
   };
 
