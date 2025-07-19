@@ -45,6 +45,8 @@ function App() {
   const maxInitAttempts = 5;
   const [currentTheme, setCurrentTheme] = useState<ColorTheme>(getCurrentTheme(''));
   const [filterModalTheme, setFilterModalTheme] = useState<ColorTheme>(getCurrentTheme(''));
+  const selectedCategoryRef = useRef<string>('');
+  const selectedVocalistRef = useRef<string>('');
 
   // フィルタ適用
   const filteredTracks = tracks.filter(t => {
@@ -187,13 +189,23 @@ function App() {
             onStateChange: (event: any) => {
               // 最新のfilteredTracksとcurrentTrackIdxを取得
               const currentFilteredTracks = tracks.filter(t => {
-                const matchCategory = !selectedCategory || t.category === selectedCategory;
-                const matchVocalist = !selectedVocalist || (t.vocalist && t.vocalist.split(',').map((v: string) => v.trim()).includes(selectedVocalist));
+                const matchCategory = !selectedCategoryRef.current || t.category === selectedCategoryRef.current;
+                const matchVocalist = !selectedVocalistRef.current || (t.vocalist && t.vocalist.split(',').map((v: string) => v.trim()).includes(selectedVocalistRef.current));
                 return matchCategory && matchVocalist;
               });
               
               // 最新のcurrentTrackIdxを取得
               const latestCurrentTrackIdx = currentTrackIdxRef.current;
+              
+              console.log('YouTube onStateChange:', {
+                eventData: event.data,
+                currentFilteredTracksLength: currentFilteredTracks.length,
+                latestCurrentTrackIdx,
+                currentTrack: currentFilteredTracks[latestCurrentTrackIdx],
+                selectedCategory: selectedCategoryRef.current,
+                selectedVocalist: selectedVocalistRef.current,
+                allTracksLength: tracks.length
+              });
               
               if (event.data === window.YT.PlayerState.ENDED) {
                 setIsPlaying(false);
@@ -202,6 +214,7 @@ function App() {
                   if (isRepeatRef.current) {
                     // リピート時は同じ曲を再生
                     const currentTrack = currentFilteredTracks[latestCurrentTrackIdx];
+                    console.log('Repeat mode - current track:', currentTrack);
                     if (playerRef.current && playerReadyRef.current && currentTrack) {
                       try {
                         playerRef.current.loadVideoById({
@@ -220,7 +233,8 @@ function App() {
                     setProgress(0);
                   } else if (isRandomRef.current) {
                     // ランダム時はランダムに次の曲を選択
-                    const nextIdx = getRandomIndex();
+                    const nextIdx = Math.floor(Math.random() * currentFilteredTracks.length);
+                    console.log('Random mode - next index:', nextIdx, 'track:', currentFilteredTracks[nextIdx]);
                     setCurrentTrackIdx(nextIdx);
                     if (playerRef.current && playerReadyRef.current) {
                       const nextTrack = currentFilteredTracks[nextIdx];
@@ -242,6 +256,7 @@ function App() {
                   } else if (latestCurrentTrackIdx < currentFilteredTracks.length - 1) {
                     // シーケンシャル時は次の曲に進む
                     const nextIdx = latestCurrentTrackIdx + 1;
+                    console.log('Sequential mode - next index:', nextIdx, 'track:', currentFilteredTracks[nextIdx]);
                     if (playerRef.current && playerReadyRef.current) {
                       const nextTrack = currentFilteredTracks[nextIdx];
                       try {
@@ -287,6 +302,7 @@ function App() {
                     setProgress(0);
                   } else {
                     // 最後の曲の場合は停止
+                    console.log('Last track reached - stopping');
                     setIsPlaying(false);
                     setProgress(0);
                   }
@@ -354,7 +370,16 @@ function App() {
             category: t.category,
             start_time: Number(t.start_time),
             end_time: Number(t.end_time),
-          }));
+            date: t.date || null, // 投稿日時
+          }))
+          .sort((a: any, b: any) => {
+            // 投稿日時でソート（新しい順）
+            if (!a.date && !b.date) return 0;
+            if (!a.date) return 1;
+            if (!b.date) return -1;
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          });
+        
         if (parsedTracks.length === 0) {
           throw new Error('No valid tracks found in CSV');
         }
@@ -549,6 +574,15 @@ function App() {
     setCurrentTheme(getCurrentTheme(selectedVocalist));
   }, [selectedVocalist]);
 
+  // selectedCategoryとselectedVocalistの変更をrefに反映
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    selectedVocalistRef.current = selectedVocalist;
+  }, [selectedVocalist]);
+
   // フィルタモーダル内でpendingVocalistが変更された時にテーマを更新
   useEffect(() => {
     if (showFilter) {
@@ -654,8 +688,16 @@ function App() {
     setIsUserScrolling(false);
     setHasUserInteracted(true); // ユーザーインタラクションを記録
     
+    console.log('handleNext called:', {
+      isRandom,
+      currentTrackIdx: currentTrackIdxRef.current,
+      filteredTracksLength: filteredTracks.length,
+      currentTrack: filteredTracks[currentTrackIdxRef.current]
+    });
+    
     if (isRandom) {
       const nextIdx = getRandomIndex();
+      console.log('Random next - index:', nextIdx, 'track:', filteredTracks[nextIdx]);
       setCurrentTrackIdx(nextIdx);
       if (playerRef.current && playerReadyRef.current) {
         const nextTrack = filteredTracks[nextIdx];
@@ -671,6 +713,7 @@ function App() {
       setProgress(0);
     } else if (currentTrackIdxRef.current < filteredTracks.length - 1) {
       const nextIdx = currentTrackIdxRef.current + 1;
+      console.log('Sequential next - index:', nextIdx, 'track:', filteredTracks[nextIdx]);
       setCurrentTrackIdx(nextIdx);
       if (playerRef.current && playerReadyRef.current) {
         const nextTrack = filteredTracks[nextIdx];
@@ -691,8 +734,16 @@ function App() {
     setIsUserScrolling(false);
     setHasUserInteracted(true); // ユーザーインタラクションを記録
     
+    console.log('handlePrev called:', {
+      isRandom,
+      currentTrackIdx: currentTrackIdxRef.current,
+      filteredTracksLength: filteredTracks.length,
+      currentTrack: filteredTracks[currentTrackIdxRef.current]
+    });
+    
     if (isRandom) {
       const prevIdx = getRandomIndex();
+      console.log('Random prev - index:', prevIdx, 'track:', filteredTracks[prevIdx]);
       setCurrentTrackIdx(prevIdx);
       if (playerRef.current && playerReadyRef.current) {
         const prevTrack = filteredTracks[prevIdx];
@@ -708,6 +759,7 @@ function App() {
       setProgress(0);
     } else if (currentTrackIdxRef.current > 0) {
       const prevIdx = currentTrackIdxRef.current - 1;
+      console.log('Sequential prev - index:', prevIdx, 'track:', filteredTracks[prevIdx]);
       setCurrentTrackIdx(prevIdx);
       if (playerRef.current && playerReadyRef.current) {
         const prevTrack = filteredTracks[prevIdx];
@@ -1021,8 +1073,22 @@ function App() {
                 {/* カテゴリフィルタ */}
                 <div style={{ fontWeight: 'bold', marginBottom: 2 }}>カテゴリ</div>
                 <div className="custom-radio-group">
-                  <label className="custom-radio-label">
-                    <input className="custom-radio-input" type="radio" name="category" value="" checked={pendingCategory === ''} onChange={() => setPendingCategory('')} />
+                  <label className="custom-radio-label" style={{ position: 'relative' }} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('');
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('');
+                    }}
+                  >
+                    <input className="custom-radio-input" type="radio" name="category" value="" checked={pendingCategory === ''} onChange={(e) => {
+                      e.stopPropagation();
+                      setPendingCategory('');
+                    }} />
                     <span className="custom-radio-custom" style={{ 
                       borderColor: filterModalTheme.primary,
                       ...(pendingCategory === '' && { 
@@ -1030,23 +1096,24 @@ function App() {
                         background: filterModalTheme.primary 
                       })
                     }} />
-                    {pendingCategory === '' && (
-                      <span style={{
-                        position: 'absolute',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: filterModalTheme.textColor,
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'none'
-                      }} />
-                    )}
                     すべて
                   </label>
-                  <label className="custom-radio-label">
-                    <input className="custom-radio-input" type="radio" name="category" value="utamita" checked={pendingCategory === 'utamita'} onChange={() => setPendingCategory('utamita')} />
+                  <label className="custom-radio-label" style={{ position: 'relative' }} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('utamita');
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('utamita');
+                    }}
+                  >
+                    <input className="custom-radio-input" type="radio" name="category" value="utamita" checked={pendingCategory === 'utamita'} onChange={(e) => {
+                      e.stopPropagation();
+                      setPendingCategory('utamita');
+                    }} />
                     <span className="custom-radio-custom" style={{ 
                       borderColor: filterModalTheme.primary,
                       ...(pendingCategory === 'utamita' && { 
@@ -1054,23 +1121,24 @@ function App() {
                         background: filterModalTheme.primary 
                       })
                     }} />
-                    {pendingCategory === 'utamita' && (
-                      <span style={{
-                        position: 'absolute',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: filterModalTheme.textColor,
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'none'
-                      }} />
-                    )}
                     歌ってみた
                   </label>
-                  <label className="custom-radio-label">
-                    <input className="custom-radio-input" type="radio" name="category" value="utawaku" checked={pendingCategory === 'utawaku'} onChange={() => setPendingCategory('utawaku')} />
+                  <label className="custom-radio-label" style={{ position: 'relative' }} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('utawaku');
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('utawaku');
+                    }}
+                  >
+                    <input className="custom-radio-input" type="radio" name="category" value="utawaku" checked={pendingCategory === 'utawaku'} onChange={(e) => {
+                      e.stopPropagation();
+                      setPendingCategory('utawaku');
+                    }} />
                     <span className="custom-radio-custom" style={{ 
                       borderColor: filterModalTheme.primary,
                       ...(pendingCategory === 'utawaku' && { 
@@ -1078,23 +1146,24 @@ function App() {
                         background: filterModalTheme.primary 
                       })
                     }} />
-                    {pendingCategory === 'utawaku' && (
-                      <span style={{
-                        position: 'absolute',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: filterModalTheme.textColor,
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'none'
-                      }} />
-                    )}
                     歌枠
                   </label>
-                  <label className="custom-radio-label">
-                    <input className="custom-radio-input" type="radio" name="category" value="original" checked={pendingCategory === 'original'} onChange={() => setPendingCategory('original')} />
+                  <label className="custom-radio-label" style={{ position: 'relative' }} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('original');
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingCategory('original');
+                    }}
+                  >
+                    <input className="custom-radio-input" type="radio" name="category" value="original" checked={pendingCategory === 'original'} onChange={(e) => {
+                      e.stopPropagation();
+                      setPendingCategory('original');
+                    }} />
                     <span className="custom-radio-custom" style={{ 
                       borderColor: filterModalTheme.primary,
                       ...(pendingCategory === 'original' && { 
@@ -1102,27 +1171,28 @@ function App() {
                         background: filterModalTheme.primary 
                       })
                     }} />
-                    {pendingCategory === 'original' && (
-                      <span style={{
-                        position: 'absolute',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: filterModalTheme.textColor,
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'none'
-                      }} />
-                    )}
                     オリジナル
                   </label>
                 </div>
                 {/* メンバーフィルタ */}
                 <div style={{ fontWeight: 'bold', marginBottom: 2 }}>メンバー</div>
                 <div className="custom-radio-group" style={{ marginBottom: 8 }}>
-                  <label className="custom-radio-label">
-                    <input className="custom-radio-input" type="radio" name="vocalist" value="" checked={pendingVocalist === ''} onChange={() => setPendingVocalist('')} />
+                  <label className="custom-radio-label" style={{ position: 'relative' }} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingVocalist('');
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPendingVocalist('');
+                    }}
+                  >
+                    <input className="custom-radio-input" type="radio" name="vocalist" value="" checked={pendingVocalist === ''} onChange={(e) => {
+                      e.stopPropagation();
+                      setPendingVocalist('');
+                    }} />
                     <span className="custom-radio-custom" style={{ 
                       borderColor: filterModalTheme.primary,
                       ...(pendingVocalist === '' && { 
@@ -1130,24 +1200,25 @@ function App() {
                         background: filterModalTheme.primary 
                       })
                     }} />
-                    {pendingVocalist === '' && (
-                      <span style={{
-                        position: 'absolute',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: filterModalTheme.textColor,
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        pointerEvents: 'none'
-                      }} />
-                    )}
                     すべて
                   </label>
                   {vocalistList.map(v => (
-                    <label key={v} className="custom-radio-label">
-                      <input className="custom-radio-input" type="radio" name="vocalist" value={v} checked={pendingVocalist === v} onChange={() => setPendingVocalist(v)} />
+                    <label key={v} className="custom-radio-label" style={{ position: 'relative' }} 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setPendingVocalist(v);
+                      }}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setPendingVocalist(v);
+                      }}
+                    >
+                      <input className="custom-radio-input" type="radio" name="vocalist" value={v} checked={pendingVocalist === v} onChange={(e) => {
+                        e.stopPropagation();
+                        setPendingVocalist(v);
+                      }} />
                       <span className="custom-radio-custom" style={{ 
                         borderColor: filterModalTheme.primary,
                         ...(pendingVocalist === v && { 
@@ -1155,19 +1226,6 @@ function App() {
                           background: filterModalTheme.primary 
                         })
                       }} />
-                      {pendingVocalist === v && (
-                        <span style={{
-                          position: 'absolute',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: filterModalTheme.textColor,
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          pointerEvents: 'none'
-                        }} />
-                      )}
                       {v}
                     </label>
                   ))}
