@@ -451,6 +451,33 @@ function App() {
     currentTrackIdxRef.current = currentTrackIdx;
   }, [currentTrackIdx]);
 
+  // 選択されている楽曲をスクロール範囲内の先頭に表示
+  const scrollToCurrentTrack = useCallback(() => {
+    console.log('scrollToCurrentTrack called, currentTrackIdx:', currentTrackIdx, 'isUserScrolling:', isUserScrolling);
+    if (!listAreaRef.current) {
+      console.log('listAreaRef.current is null');
+      return;
+    }
+    
+    const selectedElement = listAreaRef.current.querySelector('.track-item.selected') as HTMLElement;
+    if (selectedElement) {
+      console.log('Selected element found');
+      // ユーザーが手動スクロール中でない場合のみ自動スクロール
+      if (!isUserScrolling) {
+        console.log('Executing scroll to track:', currentTrackIdx);
+        selectedElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      } else {
+        console.log('Skipping scroll - user is scrolling');
+      }
+    } else {
+      console.log('Selected element not found');
+    }
+  }, [currentTrackIdx, isUserScrolling]);
+
   // currentTrackIdxが変更された時にスクロール
   useEffect(() => {
     console.log('currentTrackIdx changed to:', currentTrackIdx);
@@ -468,7 +495,7 @@ function App() {
     }, 200);
     
     return () => clearTimeout(timer);
-  }, [currentTrackIdx, isUserScrolling]);
+  }, [currentTrackIdx, isUserScrolling, scrollToCurrentTrack]);
 
   // isRepeatとisRandomの変更をrefに反映
   useEffect(() => {
@@ -504,33 +531,6 @@ function App() {
       setIsUserScrolling(false);
     }, 1000);
   };
-
-  // 選択されている楽曲をスクロール範囲内の先頭に表示
-  const scrollToCurrentTrack = useCallback(() => {
-    console.log('scrollToCurrentTrack called, currentTrackIdx:', currentTrackIdx, 'isUserScrolling:', isUserScrolling);
-    if (!listAreaRef.current) {
-      console.log('listAreaRef.current is null');
-      return;
-    }
-    
-    const selectedElement = listAreaRef.current.querySelector('.track-item.selected') as HTMLElement;
-    if (selectedElement) {
-      console.log('Selected element found');
-      // ユーザーが手動スクロール中でない場合のみ自動スクロール
-      if (!isUserScrolling) {
-        console.log('Executing scroll to track:', currentTrackIdx);
-        selectedElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-          inline: 'nearest'
-        });
-      } else {
-        console.log('Skipping scroll - user is scrolling');
-      }
-    } else {
-      console.log('Selected element not found');
-    }
-  }, [currentTrackIdx, isUserScrolling]);
 
   // 再生区間が終わったら次の動画へ
   useEffect(() => {
