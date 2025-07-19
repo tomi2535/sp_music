@@ -465,11 +465,27 @@ function App() {
       // ユーザーが手動スクロール中でない場合のみ自動スクロール
       if (!isUserScrolling) {
         console.log('Executing scroll to track:', currentTrackIdx);
-        selectedElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-          inline: 'nearest'
-        });
+        
+        // モバイルレイアウトでのスクロール位置調整
+        if (window.innerWidth < 900) {
+          // モバイルではヘッダー分の余白を考慮してスクロール
+          const headerHeight = 48;
+          const elementTop = selectedElement.offsetTop;
+          const containerTop = listAreaRef.current.offsetTop;
+          const scrollTop = elementTop - containerTop - headerHeight;
+          
+          listAreaRef.current.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+        } else {
+          // デスクトップでは通常のスクロール
+          selectedElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
+        }
       } else {
         console.log('Skipping scroll - user is scrolling');
       }
@@ -482,10 +498,10 @@ function App() {
   useEffect(() => {
     console.log('currentTrackIdx changed to:', currentTrackIdx);
     
-    // トラック切り替え時は手動スクロール状態をリセット
+    // 手動スクロール状態の場合は自動スクロールをスキップ
     if (isUserScrolling) {
-      console.log('Resetting isUserScrolling for track change');
-      setIsUserScrolling(false);
+      console.log('Skipping auto-scroll - user has manually scrolled');
+      return;
     }
     
     // 少し遅延させてDOMの更新を待つ
@@ -525,11 +541,7 @@ function App() {
   const handleUserScroll = () => {
     console.log('User scroll detected, setting isUserScrolling to true');
     setIsUserScrolling(true);
-    // 1秒後に自動スクロールを再開
-    setTimeout(() => {
-      console.log('Resetting isUserScrolling to false');
-      setIsUserScrolling(false);
-    }, 1000);
+    // 手動スクロール状態は永続的に保持（自動リセットしない）
   };
 
   // 再生区間が終わったら次の動画へ
@@ -594,6 +606,9 @@ function App() {
   };
   // 次・前
   const handleNext = async () => {
+    // 次/前ボタンクリック時は手動スクロール状態をリセット
+    setIsUserScrolling(false);
+    
     if (isRandom) {
       const nextIdx = getRandomIndex();
       setCurrentTrackIdx(nextIdx);
@@ -627,6 +642,9 @@ function App() {
     }
   };
   const handlePrev = async () => {
+    // 次/前ボタンクリック時は手動スクロール状態をリセット
+    setIsUserScrolling(false);
+    
     if (isRandom) {
       const prevIdx = getRandomIndex();
       setCurrentTrackIdx(prevIdx);
@@ -825,6 +843,9 @@ function App() {
 
   // リストクリック
   const handleTrackClick = async (idx: number) => {
+    // トラッククリック時は手動スクロール状態をリセット
+    setIsUserScrolling(false);
+    
     setCurrentTrackIdx(idx);
     if (playerRef.current && playerReadyRef.current) {
       const track = filteredTracks[idx];
