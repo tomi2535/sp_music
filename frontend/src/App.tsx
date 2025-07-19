@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import Papa from 'papaparse';
 import { announcements } from './announcement';
+import { getCurrentTheme, ColorTheme } from './skins';
 
 declare global {
   interface Window {
@@ -26,6 +27,7 @@ function App() {
   const [isVideoHidden, setIsVideoHidden] = useState(false); // 動画領域の表示/非表示
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900); // モバイルレイアウトかどうか
   const [showAnnouncement, setShowAnnouncement] = useState(false); // お知らせモーダルの表示/非表示
+  const [hasUserInteracted, setHasUserInteracted] = useState(false); // ユーザーインタラクションの有無
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null);
@@ -41,6 +43,8 @@ function App() {
   const [playerReady, setPlayerReady] = useState(false);
   const [initAttempts, setInitAttempts] = useState(0);
   const maxInitAttempts = 5;
+  const [currentTheme, setCurrentTheme] = useState<ColorTheme>(getCurrentTheme(''));
+  const [filterModalTheme, setFilterModalTheme] = useState<ColorTheme>(getCurrentTheme(''));
 
   // フィルタ適用
   const filteredTracks = tracks.filter(t => {
@@ -172,10 +176,13 @@ function App() {
             modestbranding: 1,
             showinfo: 0,
             autoplay: 0, // 自動再生を無効化
+            enablejsapi: 1, // JavaScript APIを有効化
+            origin: window.location.origin, // オリジンを明示的に設定
           },
           events: {
             onReady: () => {
               setPlayerReady(true);
+              console.log('YouTube player ready');
             },
             onStateChange: (event: any) => {
               // 最新のfilteredTracksとcurrentTrackIdxを取得
@@ -201,8 +208,11 @@ function App() {
                           videoId: currentTrack.videoId,
                           startSeconds: currentTrack.start_time,
                         });
-                        playerRef.current.playVideo();
-                        setIsPlaying(true);
+                        // ユーザーインタラクションがある場合のみ自動再生
+                        if (hasUserInteracted) {
+                          playerRef.current.playVideo();
+                          setIsPlaying(true);
+                        }
                       } catch (error) {
                         console.error('Failed to load repeat video:', error);
                       }
@@ -219,8 +229,11 @@ function App() {
                           videoId: nextTrack.videoId,
                           startSeconds: nextTrack.start_time,
                         });
-                        playerRef.current.playVideo();
-                        setIsPlaying(true);
+                        // ユーザーインタラクションがある場合のみ自動再生
+                        if (hasUserInteracted) {
+                          playerRef.current.playVideo();
+                          setIsPlaying(true);
+                        }
                       } catch (error) {
                         console.error('Failed to load random video:', error);
                       }
@@ -241,8 +254,11 @@ function App() {
                         // 動画が読み込まれた後に時間範囲を設定
                         setTimeout(() => {
                           if (playerRef.current && playerReadyRef.current) {
-                            playerRef.current.playVideo();
-                            setIsPlaying(true);
+                            // ユーザーインタラクションがある場合のみ自動再生
+                            if (hasUserInteracted) {
+                              playerRef.current.playVideo();
+                              setIsPlaying(true);
+                            }
                             // 動画の読み込みが完了してからcurrentTrackIdxを更新
                             setCurrentTrackIdx(nextIdx);
                             
@@ -304,8 +320,9 @@ function App() {
       }
     };
     
-    // 少し遅延させて初期化
-    setTimeout(initPlayer, 100);
+    // モバイルデバイスでは少し長めの遅延を設定
+    const delay = window.innerWidth < 900 ? 500 : 100;
+    setTimeout(initPlayer, delay);
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytReady, initAttempts]);
@@ -527,6 +544,27 @@ function App() {
     playerReadyRef.current = playerReady;
   }, [playerReady]);
 
+  // 選択されたボーカリストが変更された時にテーマを更新
+  useEffect(() => {
+    setCurrentTheme(getCurrentTheme(selectedVocalist));
+  }, [selectedVocalist]);
+
+  // フィルタモーダル内でpendingVocalistが変更された時にテーマを更新
+  useEffect(() => {
+    if (showFilter) {
+      setFilterModalTheme(getCurrentTheme(pendingVocalist));
+    }
+  }, [pendingVocalist, showFilter]);
+
+  // テーマが変更された時にシークバーの色を更新
+  useEffect(() => {
+    const seekBar = document.querySelector('.custom-seek-bar') as HTMLInputElement;
+    if (seekBar) {
+      const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
+      seekBar.style.background = `linear-gradient(to right, ${currentTheme.secondary} 0%, ${currentTheme.secondary} ${progressPercent}%, rgba(255, 255, 255, 0.3) ${progressPercent}%, rgba(255, 255, 255, 0.3) 100%)`;
+    }
+  }, [currentTheme, progress, duration]);
+
   // ランダムで次のインデックスを取得（現在の曲以外）
   const getRandomIndex = () => {
     if (filteredTracks.length <= 1) return currentTrackIdx;
@@ -541,7 +579,13 @@ function App() {
   const handleUserScroll = () => {
     console.log('User scroll detected, setting isUserScrolling to true');
     setIsUserScrolling(true);
+    setHasUserInteracted(true); // ユーザーインタラクションを記録
     // 手動スクロール状態は永続的に保持（自動リセットしない）
+  };
+
+  // ユーザーインタラクションを検知する関数
+  const handleUserInteraction = () => {
+    setHasUserInteracted(true);
   };
 
   // 再生区間が終わったら次の動画へ
@@ -608,6 +652,7 @@ function App() {
   const handleNext = async () => {
     // 次/前ボタンクリック時は手動スクロール状態をリセット
     setIsUserScrolling(false);
+    setHasUserInteracted(true); // ユーザーインタラクションを記録
     
     if (isRandom) {
       const nextIdx = getRandomIndex();
@@ -644,6 +689,7 @@ function App() {
   const handlePrev = async () => {
     // 次/前ボタンクリック時は手動スクロール状態をリセット
     setIsUserScrolling(false);
+    setHasUserInteracted(true); // ユーザーインタラクションを記録
     
     if (isRandom) {
       const prevIdx = getRandomIndex();
@@ -845,6 +891,7 @@ function App() {
   const handleTrackClick = async (idx: number) => {
     // トラッククリック時は手動スクロール状態をリセット
     setIsUserScrolling(false);
+    setHasUserInteracted(true); // ユーザーインタラクションを記録
     
     setCurrentTrackIdx(idx);
     if (playerRef.current && playerReadyRef.current) {
@@ -864,17 +911,31 @@ function App() {
   return (
     <div className="App" style={{ fontFamily: 'sans-serif', background: '#f9f9f9', height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* ヘッダー */}
-      <header>
+      <header style={{ background: currentTheme.primary, color: currentTheme.textColor }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', marginRight: '16px' }}>
-          <img 
-            src="/logo.png" 
-            alt="Speciale Music" 
-            style={{ 
-              height: '32px', 
-              width: 'auto',
-              maxWidth: '200px'
-            }} 
-          />
+          {currentTheme.logo.startsWith('/') ? (
+            <img 
+              src={currentTheme.logo} 
+              alt="Speciale Music" 
+              style={{ 
+                height: '32px', 
+                width: 'auto',
+                maxWidth: '200px'
+              }} 
+            />
+          ) : (
+            <div 
+              style={{ 
+                fontSize: '24px',
+                lineHeight: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              {currentTheme.logo}
+            </div>
+          )}
         </div>
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
           {/* お知らせボタン */}
@@ -885,7 +946,7 @@ function App() {
               width: 40,
               height: 40,
               margin: '0 4px',
-              color: '#FEFCF5',
+              color: currentTheme.textColor,
               background: 'none',
               borderRadius: '4px',
               transition: 'background 0.2s',
@@ -908,7 +969,7 @@ function App() {
                 width: 40,
                 height: 40,
                 margin: '0 4px',
-                color: '#FEFCF5',
+                color: currentTheme.textColor,
                 background: isVideoHidden ? 'rgba(97, 218, 251, 0.15)' : 'none',
                 borderRadius: '4px',
                 transition: 'background 0.2s',
@@ -942,7 +1003,7 @@ function App() {
               width: 40,
               height: 40,
               margin: '0 4px',
-              color: '#FEFCF5',
+              color: currentTheme.textColor,
               background: showFilter ? 'rgba(97, 218, 251, 0.15)' : 'none',
               borderRadius: '4px',
               transition: 'background 0.2s',
@@ -962,19 +1023,99 @@ function App() {
                 <div className="custom-radio-group">
                   <label className="custom-radio-label">
                     <input className="custom-radio-input" type="radio" name="category" value="" checked={pendingCategory === ''} onChange={() => setPendingCategory('')} />
-                    <span className="custom-radio-custom" /> すべて
+                    <span className="custom-radio-custom" style={{ 
+                      borderColor: filterModalTheme.primary,
+                      ...(pendingCategory === '' && { 
+                        borderColor: filterModalTheme.primary, 
+                        background: filterModalTheme.primary 
+                      })
+                    }} />
+                    {pendingCategory === '' && (
+                      <span style={{
+                        position: 'absolute',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: filterModalTheme.textColor,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none'
+                      }} />
+                    )}
+                    すべて
                   </label>
                   <label className="custom-radio-label">
                     <input className="custom-radio-input" type="radio" name="category" value="utamita" checked={pendingCategory === 'utamita'} onChange={() => setPendingCategory('utamita')} />
-                    <span className="custom-radio-custom" /> 歌ってみた
+                    <span className="custom-radio-custom" style={{ 
+                      borderColor: filterModalTheme.primary,
+                      ...(pendingCategory === 'utamita' && { 
+                        borderColor: filterModalTheme.primary, 
+                        background: filterModalTheme.primary 
+                      })
+                    }} />
+                    {pendingCategory === 'utamita' && (
+                      <span style={{
+                        position: 'absolute',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: filterModalTheme.textColor,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none'
+                      }} />
+                    )}
+                    歌ってみた
                   </label>
                   <label className="custom-radio-label">
                     <input className="custom-radio-input" type="radio" name="category" value="utawaku" checked={pendingCategory === 'utawaku'} onChange={() => setPendingCategory('utawaku')} />
-                    <span className="custom-radio-custom" /> 歌枠
+                    <span className="custom-radio-custom" style={{ 
+                      borderColor: filterModalTheme.primary,
+                      ...(pendingCategory === 'utawaku' && { 
+                        borderColor: filterModalTheme.primary, 
+                        background: filterModalTheme.primary 
+                      })
+                    }} />
+                    {pendingCategory === 'utawaku' && (
+                      <span style={{
+                        position: 'absolute',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: filterModalTheme.textColor,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none'
+                      }} />
+                    )}
+                    歌枠
                   </label>
                   <label className="custom-radio-label">
                     <input className="custom-radio-input" type="radio" name="category" value="original" checked={pendingCategory === 'original'} onChange={() => setPendingCategory('original')} />
-                    <span className="custom-radio-custom" /> オリジナル
+                    <span className="custom-radio-custom" style={{ 
+                      borderColor: filterModalTheme.primary,
+                      ...(pendingCategory === 'original' && { 
+                        borderColor: filterModalTheme.primary, 
+                        background: filterModalTheme.primary 
+                      })
+                    }} />
+                    {pendingCategory === 'original' && (
+                      <span style={{
+                        position: 'absolute',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: filterModalTheme.textColor,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none'
+                      }} />
+                    )}
+                    オリジナル
                   </label>
                 </div>
                 {/* メンバーフィルタ */}
@@ -982,12 +1123,52 @@ function App() {
                 <div className="custom-radio-group" style={{ marginBottom: 8 }}>
                   <label className="custom-radio-label">
                     <input className="custom-radio-input" type="radio" name="vocalist" value="" checked={pendingVocalist === ''} onChange={() => setPendingVocalist('')} />
-                    <span className="custom-radio-custom" /> すべて
+                    <span className="custom-radio-custom" style={{ 
+                      borderColor: filterModalTheme.primary,
+                      ...(pendingVocalist === '' && { 
+                        borderColor: filterModalTheme.primary, 
+                        background: filterModalTheme.primary 
+                      })
+                    }} />
+                    {pendingVocalist === '' && (
+                      <span style={{
+                        position: 'absolute',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: filterModalTheme.textColor,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        pointerEvents: 'none'
+                      }} />
+                    )}
+                    すべて
                   </label>
                   {vocalistList.map(v => (
                     <label key={v} className="custom-radio-label">
                       <input className="custom-radio-input" type="radio" name="vocalist" value={v} checked={pendingVocalist === v} onChange={() => setPendingVocalist(v)} />
-                      <span className="custom-radio-custom" /> {v}
+                      <span className="custom-radio-custom" style={{ 
+                        borderColor: filterModalTheme.primary,
+                        ...(pendingVocalist === v && { 
+                          borderColor: filterModalTheme.primary, 
+                          background: filterModalTheme.primary 
+                        })
+                      }} />
+                      {pendingVocalist === v && (
+                        <span style={{
+                          position: 'absolute',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: filterModalTheme.textColor,
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          pointerEvents: 'none'
+                        }} />
+                      )}
+                      {v}
                     </label>
                   ))}
                 </div>
@@ -996,8 +1177,8 @@ function App() {
                   style={{ 
                     width: '100%', 
                     padding: '8px', 
-                    background: previewTracks.length === 0 ? '#ccc' : '#12320d', 
-                    color: '#fff', 
+                    background: previewTracks.length === 0 ? '#ccc' : filterModalTheme.primary, 
+                    color: previewTracks.length === 0 ? '#666' : filterModalTheme.textColor, 
                     border: 'none', 
                     borderRadius: 4, 
                     fontWeight: 'bold', 
@@ -1074,8 +1255,8 @@ function App() {
                     style={{ 
                       width: '100%', 
                       padding: '8px', 
-                      background: '#12320d', 
-                      color: '#fff', 
+                      background: currentTheme.primary, 
+                      color: currentTheme.textColor, 
                       border: 'none', 
                       borderRadius: 4, 
                       fontWeight: 'bold', 
@@ -1098,26 +1279,19 @@ function App() {
         <div className="main-content" style={{flex: 1, minHeight: 0}}>
           <div 
             className="video-area" 
-            ref={videoAreaRef} 
+            ref={videoAreaRef}
             style={{ 
-              minHeight: window.innerWidth >= 900 ? '400px' : '200px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              background: '#000', 
-              color: '#fff',
-              width: '100%',
-              flexDirection: 'column',
-              gap: '16px'
+              display: 'block'
             }}
           >
-            {/* iframeContainerRefを常にレンダリング */}
             <div 
               ref={iframeContainerRef} 
               style={{ 
+                position: 'absolute',
+                top: '0',
+                left: '0',
                 width: '100%', 
                 height: '100%',
-                minHeight: '200px',
                 background: '#000',
                 display: 'flex',
                 alignItems: 'center',
@@ -1172,9 +1346,11 @@ function App() {
               <div 
                 ref={iframeContainerRef} 
                 style={{ 
+                  position: 'absolute',
+                  top: '0',
+                  left: '0',
                   width: '100%', 
                   height: '100%',
-                  minHeight: '200px',
                   background: '#000',
                   display: 'flex',
                   alignItems: 'center',
@@ -1191,6 +1367,8 @@ function App() {
               onScroll={handleUserScroll}
               onWheel={handleUserScroll}
               onTouchMove={handleUserScroll}
+              onClick={handleUserInteraction}
+              onTouchStart={handleUserInteraction}
             >
               {filteredTracks.map((track, idx) => (
                 <div
@@ -1213,7 +1391,7 @@ function App() {
           </div>
 
           {/* フッター操作パネル */}
-          <footer>
+          <footer style={{ background: currentTheme.primary }}>
             <div style={{ position: 'absolute', left: 16, bottom: 24, display: 'flex', gap: 8 }}>
               <button
                 onClick={() => {
@@ -1227,12 +1405,12 @@ function App() {
                   ...iconBtnStyle,
                   width: 32,
                   height: 32,
-                  color: isRandom ? '#61dafb' : '#FEFCF5',
-                  background: isRandom ? 'rgba(97, 218, 251, 0.15)' : 'none',
+                  color: currentTheme.textColor,
+                  background: isRandom ? 'rgba(255, 255, 255, 0.2)' : 'none',
                   border: 'none',
                   margin: 0,
                   padding: 0,
-                  opacity: isRandom ? 1 : 0.7,
+                  opacity: 1,
                   borderRadius: '4px',
                   transition: 'color 0.2s, opacity 0.2s, background 0.2s',
                 }}
@@ -1259,12 +1437,12 @@ function App() {
                   ...iconBtnStyle,
                   width: 32,
                   height: 32,
-                  color: isRepeat ? '#61dafb' : '#FEFCF5',
-                  background: isRepeat ? 'rgba(97, 218, 251, 0.15)' : 'none',
+                  color: currentTheme.textColor,
+                  background: isRepeat ? 'rgba(255, 255, 255, 0.2)' : 'none',
                   border: 'none',
                   margin: 0,
                   padding: 0,
-                  opacity: isRepeat ? 1 : 0.7,
+                  opacity: 1,
                   borderRadius: '4px',
                   transition: 'color 0.2s, opacity 0.2s, background 0.2s',
                 }}
@@ -1289,14 +1467,23 @@ function App() {
               onChange={handleSeek}
               onMouseUp={handleSeekCommit}
               onTouchEnd={handleSeekCommit}
-              style={{ width: '100%', margin: '12px 0 12px 0', accentColor: '#61dafb', height: 4 }}
+              style={{ 
+                width: '100%', 
+                margin: '12px 0 12px 0', 
+                height: 4,
+                WebkitAppearance: 'none',
+                appearance: 'none',
+                background: 'transparent',
+                cursor: 'pointer'
+              }}
+              className="custom-seek-bar"
             />
             {/* 楽曲情報と操作ボタン（縦並び） */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
               {/* 再生中のサムネ・情報 */}
               <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, marginBottom: 4, width: '100%', justifyContent: 'center' }}>
                 <img src={currentTrack.thumbnail} alt={currentTrack.track_title} style={{ width: 40, height: 24, objectFit: 'cover', borderRadius: '4px', marginRight: 8 }} />
-                <div style={{ color: '#fff', fontSize: '0.95rem', minWidth: 0, overflow: 'hidden', flex: 1, textAlign: 'left' }}>
+                <div style={{ color: currentTheme.textColor, fontSize: '0.95rem', minWidth: 0, overflow: 'hidden', flex: 1, textAlign: 'left' }}>
                   <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{currentTrack.track_title}</div>
                   {/* <div style={{ fontSize: '0.85rem', color: '#bbb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{currentTrack.artist}</div> */}
                 </div>
@@ -1306,23 +1493,25 @@ function App() {
                 <button onClick={handlePrev} disabled={isRepeat || currentTrackIdx === 0} style={{
                   ...iconBtnStyle,
                   opacity: isRepeat || currentTrackIdx === 0 ? 0.4 : 1,
+                  color: currentTheme.textColor,
                 }} aria-label="前">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
                 </button>
                 {isPlaying ? (
-                  <button onClick={handlePause} style={iconBtnStyle} aria-label="一時停止">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  <button onClick={handlePause} style={{...iconBtnStyle, color: currentTheme.textColor}} aria-label="一時停止">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                   </button>
                 ) : (
-                  <button onClick={handlePlay} style={iconBtnStyle} aria-label="再生">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  <button onClick={handlePlay} style={{...iconBtnStyle, color: currentTheme.textColor}} aria-label="再生">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                   </button>
                 )}
                 <button onClick={handleNext} disabled={isRepeat || currentTrackIdx === filteredTracks.length - 1} style={{
                   ...iconBtnStyle,
                   opacity: isRepeat || currentTrackIdx === filteredTracks.length - 1 ? 0.4 : 1,
+                  color: currentTheme.textColor,
                 }} aria-label="次">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
                 </button>
               </div>
             </div>
