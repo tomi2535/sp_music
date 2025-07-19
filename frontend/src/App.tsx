@@ -868,7 +868,17 @@ function App() {
     <div className="App" style={{ fontFamily: 'sans-serif', background: '#f9f9f9', height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* ヘッダー */}
       <header>
-        <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '16px' }}>Speciale Music</span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', marginRight: '16px' }}>
+          <img 
+            src="/logo.png" 
+            alt="Speciale Music" 
+            style={{ 
+              height: '32px', 
+              width: 'auto',
+              maxWidth: '200px'
+            }} 
+          />
+        </div>
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
           {/* 動画非表示ボタン（1カラムレイアウト時のみ表示） */}
           {isMobile && (
