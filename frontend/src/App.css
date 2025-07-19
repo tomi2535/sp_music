@@ -119,6 +119,12 @@ footer {
   line-height: 1.4;
 }
 
+/* 動画が非表示の時のリスト領域 */
+.list-area.video-hidden {
+  padding-top: 0; /* ヘッダー分の余白を削除（動画領域がないため） */
+  margin-top: 48px; /* ヘッダーの高さ分のマージンを追加 */
+}
+
 .list-area .track-item {
   display: flex;
   align-items: center;
@@ -183,7 +189,7 @@ footer {
 .custom-radio-custom {
   width: 18px;
   height: 18px;
-  border: 2px solid #1976d2;
+  border: 2px solid #12320d;
   border-radius: 50%;
   margin-right: 6px;
   background: #fff;
@@ -192,8 +198,8 @@ footer {
   flex-shrink: 0;
 }
 .custom-radio-input:checked + .custom-radio-custom {
-  border-color: #1976d2;
-  background: #1976d2;
+  border-color: #12320d;
+  background: #12320d;
 }
 .custom-radio-input:checked + .custom-radio-custom::after {
   content: '';
