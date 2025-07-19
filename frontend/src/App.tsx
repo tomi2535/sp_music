@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import Papa from 'papaparse';
+import { announcements } from './announcement';
 
 declare global {
   interface Window {
@@ -24,6 +25,7 @@ function App() {
   const [isSeeking, setIsSeeking] = useState(false); // シーク中かどうかのフラグ
   const [isVideoHidden, setIsVideoHidden] = useState(false); // 動画領域の表示/非表示
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900); // モバイルレイアウトかどうか
+  const [showAnnouncement, setShowAnnouncement] = useState(false); // お知らせモーダルの表示/非表示
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null);
@@ -880,6 +882,26 @@ function App() {
           />
         </div>
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+          {/* お知らせボタン */}
+          <button
+            onClick={() => setShowAnnouncement(true)}
+            style={{
+              ...iconBtnStyle,
+              width: 40,
+              height: 40,
+              margin: '0 4px',
+              color: '#FEFCF5',
+              background: 'none',
+              borderRadius: '4px',
+              transition: 'background 0.2s',
+            }}
+            aria-label="お知らせ"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+            </svg>
+          </button>
           {/* 動画非表示ボタン（1カラムレイアウト時のみ表示） */}
           {isMobile && (
             <button
@@ -998,6 +1020,78 @@ function App() {
                 >
                   {previewTracks.length}曲を表示
                 </button>
+              </div>
+            </div>
+          )}
+          {/* お知らせモーダル */}
+          {showAnnouncement && (
+            <div className="filter-modal-overlay" onClick={() => setShowAnnouncement(false)}>
+              <div className="filter-modal-content" style={{ 
+                height: '80vh',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                minWidth: '260px',
+                maxWidth: '90vw',
+                padding: '0'
+              }} onClick={e => e.stopPropagation()}>
+                {/* タイトル部分 */}
+                <div style={{ 
+                  padding: '24px 20px 12px 20px',
+                  borderBottom: '1px solid #eee',
+                  flexShrink: 0
+                }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'center' }}>
+                    このサイトについて
+                  </div>
+                </div>
+                
+                {/* スクロール可能なテキストエリア */}
+                <div style={{ 
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '16px 20px',
+                  lineHeight: '1.4',
+                  fontSize: '0.85rem'
+                }}>
+                  {announcements.map((item, index) => (
+                    <div key={index} style={{ marginBottom: '10px' }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        {item.emoji} {item.title}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#666', whiteSpace: 'pre-line' }}>
+                        {item.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 固定配置の閉じるボタン */}
+                <div style={{
+                  padding: '12px 20px 20px 20px',
+                  background: '#fff',
+                  borderTop: '1px solid #eee',
+                  flexShrink: 0,
+                  borderBottomLeftRadius: '12px',
+                  borderBottomRightRadius: '12px'
+                }}>
+                  <button
+                    style={{ 
+                      width: '100%', 
+                      padding: '8px', 
+                      background: '#12320d', 
+                      color: '#fff', 
+                      border: 'none', 
+                      borderRadius: 4, 
+                      fontWeight: 'bold', 
+                      cursor: 'pointer',
+                      fontSize: '0.9rem'
+                    }}
+                    onClick={() => setShowAnnouncement(false)}
+                  >
+                    閉じる
+                  </button>
+                </div>
               </div>
             </div>
           )}
